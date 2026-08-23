@@ -1,0 +1,51 @@
+---
+description: Break large plans into phased work with validation and commits per phase
+alwaysApply: true
+---
+
+# Phased Plans
+
+When a task is large enough to span multiple logical steps, break it into phases before implementing.
+
+## When to Phase
+
+Use multiple phases when the work involves:
+- Several distinct features or refactors
+- Changes across multiple subsystems or directories
+- Risky changes that are easier to verify incrementally
+- More than one commit worth of work
+
+Single-step fixes or small changes do not need phasing.
+
+## Branch First
+
+If a plan has multiple phases (and therefore multiple commits), work on a dedicated branch — not directly on `main` or the default branch.
+
+Create the branch before starting phase 1.
+
+## Phase Workflow
+
+For each phase:
+
+1. **Implement** — Complete only that phase's scope. Do not start the next phase.
+2. **Validate** — Run the project's checks before moving on:
+   - Lint
+   - Tests
+   - Typecheck (if the project uses one)
+   Use existing scripts (`package.json`, `Makefile`, CI config) when available.
+3. **Fix** — Resolve any failures from validation before proceeding.
+4. **Commit** — Create a focused commit for that phase with a clear message describing what the phase accomplished.
+
+Repeat for each phase until the full plan is done.
+
+## Planning
+
+When presenting a multi-phase plan, number the phases and note what validation will run between them. Example:
+
+```
+Phase 1: Add data model and types
+Phase 2: Wire up API endpoints
+Phase 3: Update UI components
+```
+
+Each phase should be independently verifiable and committable.
