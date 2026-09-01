@@ -1,0 +1,16 @@
+---
+description: Do not add Cursor attribution to commits or pull requests
+alwaysApply: true
+---
+
+# Attribution
+
+This project does not use Cursor commit or PR attribution.
+
+When creating commits or pull requests:
+
+- Do not add `Co-authored-by: Cursor` or similar co-author trailers
+- Do not add "Made with Cursor" footers or badges to commit messages or PR descriptions
+- Do not enable or suggest Cursor attribution settings for this repo
+
+If attribution is controlled by a tool or setting, leave it disabled for work in this repository.
