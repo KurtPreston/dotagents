@@ -62,7 +62,11 @@ Single-step fixes and small changes do not need phasing.
 
 ### Branch First
 
-If a plan has multiple phases and therefore multiple commits, work on a dedicated branch rather than directly on the default branch. Create the branch before starting phase one if it doesn't already exist.
+If a plan has multiple phases and therefore multiple commits, do the whole plan on one branch rather than directly on the default branch. Create that branch once, before phase one, if it doesn't already exist. Every phase then commits to that same branch.
+
+- One plan, one branch, one commit per phase. Don't create a branch per phase or stack phase branches on top of each other.
+- Name the branch for the plan (e.g. `rainforest`), not for a phase (not `rainforest/phase-3-basins`).
+- When writing a plan document for another agent to implement, state this rule as-is. Don't restate it as "each phase goes on its own branch."
 
 ### Phase Workflow
 
@@ -73,4 +77,4 @@ For each phase:
 3. **Fix** — Resolve validation failures before proceeding.
 4. **Commit** — Create a focused commit with a clear message describing what the phase accomplished.
 
-Each phase should be independently verifiable and committable. When presenting a multi-phase plan, number the phases and identify the validation that will run between them.
+Each phase should leave the branch in a passing state, so its commit can be reviewed on its own. When presenting a multi-phase plan, number the phases and identify the validation that will run between them.
