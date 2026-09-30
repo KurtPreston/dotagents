@@ -68,6 +68,14 @@ If a plan has multiple phases and therefore multiple commits, do the whole plan 
 - Name the branch for the plan (e.g. `rainforest`), not for a phase (not `rainforest/phase-3-basins`).
 - When writing a plan document for another agent to implement, state this rule as-is. Don't restate it as "each phase goes on its own branch."
 
+### Grove-Managed Projects
+
+A project is grove-managed if its root has a `grove.json` or `grove.jsonc` next to a bare `.base` repo, with one worktree folder per branch (e.g. `main/`). In these projects, each branch has its own worktree, and the folder name matches the branch name.
+
+- Don't run `git checkout`, `git switch`, or `git checkout -b` inside an existing worktree, especially the default branch's. Leave each worktree on its own branch.
+- Create or find a branch's worktree with `grove path BRANCH`, which prints the path. Then do all of that branch's work and commits there. For a plan, that means one `rainforest` branch in a `rainforest/` worktree.
+- Use flat branch names without slashes so the branch and folder names stay identical.
+
 ### Phase Workflow
 
 For each phase:
