@@ -14,6 +14,19 @@ When creating commits or pull requests:
 
 If attribution is controlled by a tool or setting, leave it disabled.
 
+## Posting on My Behalf
+
+Never post, publish, or send anything on my behalf without asking first. This applies even when the action seems implied by the task.
+
+Ask before:
+
+- Creating, editing, or deleting comments, reviews, or reactions on issues, pull requests, or discussions.
+- Opening, updating, merging, closing, or reopening pull requests or issues, including changing titles, descriptions, labels, or reviewers.
+- Pushing commits or branches, or creating releases and tags on a remote.
+- Sending messages, emails, or chat posts, or publishing to any external service.
+
+Local work such as editing files and creating local commits does not need approval. Approval for one post doesn't extend to the next; ask again for each new action, and show the exact content you intend to post.
+
 ## Section Comments
 
 When writing or editing code, add brief comments every 3–10 lines. Each comment should be succinct guiding text that describes what the lines below it are doing.
