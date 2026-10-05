@@ -13,6 +13,29 @@ if [[ "$#" -eq 0 ]]; then
   set -- cursor zed claude
 fi
 
+# Validate every target before installing any integration
+INSTALL_CLAUDE_SETTINGS=false
+for target in "$@"; do
+  case "$target" in
+    cursor|zed) ;;
+    claude) INSTALL_CLAUDE_SETTINGS=true ;;
+    *)
+      echo "error: unknown target '$target' (expected cursor, zed, or claude)" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Fail before mutations when Claude settings cannot be safely merged
+if [[ "$INSTALL_CLAUDE_SETTINGS" == true ]]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: Claude settings require Python 3; install python3 and rerun ./install.sh claude" >&2
+    exit 1
+  fi
+  python3 "$REPO_ROOT/scripts/merge-settings.py" --check \
+    "$REPO_ROOT/settings/claude.json" "$CLAUDE_HOME/settings.json"
+fi
+
 # Track shared installation work across selected agents
 INSTALL_SHARED_SKILLS=false
 INSTALL_CLAUDE_SKILLS=false
@@ -78,6 +101,8 @@ install_zed() {
 install_claude() {
   # Claude Code uses CLAUDE.md for personal standing instructions
   link_file "$REPO_ROOT/AGENTS.md" "$CLAUDE_HOME/CLAUDE.md"
+  python3 "$REPO_ROOT/scripts/merge-settings.py" \
+    "$REPO_ROOT/settings/claude.json" "$CLAUDE_HOME/settings.json"
   INSTALL_CLAUDE_SKILLS=true
 }
 
@@ -87,10 +112,6 @@ for target in "$@"; do
     cursor) install_cursor ;;
     zed) install_zed ;;
     claude) install_claude ;;
-    *)
-      echo "error: unknown target '$target' (expected cursor, zed, or claude)" >&2
-      exit 1
-      ;;
   esac
 done
 
