@@ -54,7 +54,7 @@ Run the installer again after adding a skill, editing a settings overlay, or cha
 
 ## App settings
 
-When Claude is selected, the installer merges `settings/claude.json` into `$CLAUDE_HOME/settings.json` (normally `~/.claude/settings.json`). It does **not** symlink that file. The initial overlay disables commit and PR attribution text and session links:
+When Claude is selected, the installer merges `settings/claude.json` into `$CLAUDE_HOME/settings.json` (normally `~/.claude/settings.json`). It does **not** symlink that file. The overlay disables commit and PR attribution text and session links, and opts out of nonessential data sent to Anthropic:
 
 ```json
 {
@@ -62,9 +62,15 @@ When Claude is selected, the installer merges `settings/claude.json` into `$CLAU
     "commit": "",
     "pr": "",
     "sessionUrl": false
+  },
+  "env": {
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "DISABLE_FEEDBACK_COMMAND": "1"
   }
 }
 ```
+
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` turns off usage metrics, error reports, and session quality surveys (and feature-flag evaluation, which can make Remote Control unavailable). `DISABLE_FEEDBACK_COMMAND` stops `/feedback`, `/bug`, and `/share` from uploading transcripts. Neither changes how long Anthropic retains prompts sent to the model; see the [Claude Code data usage docs](https://code.claude.com/docs/en/data-usage).
 
 The explicit object form avoids the newer `"attribution": false` shorthand, which requires Claude Code v2.1.281+. See the [Claude Code attribution reference](https://code.claude.com/docs/en/settings-reference#attribution). These are user settings; higher-precedence project or managed settings can override them, and local user settings do not automatically reach cloud sessions.
 

@@ -13,6 +13,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BASH = shutil.which("bash")
 EXPECTED_SETTINGS = {
     "attribution": {"commit": "", "pr": "", "sessionUrl": False},
+    "env": {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+            "DISABLE_FEEDBACK_COMMAND": "1"},
 }
 
 
@@ -170,6 +172,7 @@ class InstallTests(unittest.TestCase):
         self.install()
         expected = {"attribution": {**EXPECTED_SETTINGS["attribution"],
                                     "local": {"enabled": True}},
+                    "env": EXPECTED_SETTINGS["env"],
                     "permissions": {"allow": ["Read"], "local": {"mode": "ask"}}}
         self.assertEqual(json.loads(self.settings.read_bytes()), expected)
         backups = list(self.settings.parent.glob("settings.json.*.bak"))
