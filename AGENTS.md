@@ -73,9 +73,11 @@ Use multiple phases when the work involves:
 
 Single-step fixes and small changes do not need phasing.
 
+For a large effort, use the `phased-plan` skill. It covers discussing scope, writing and approving the plan, implementing it end to end, updating docs, and reporting back.
+
 ### Branch First
 
-If a plan has multiple phases and therefore multiple commits, do the whole plan on one branch rather than directly on the default branch. Create that branch once, before phase one, if it doesn't already exist. Every phase then commits to that same branch.
+If a plan has multiple phases and therefore multiple commits, do the whole plan on one branch rather than directly on the default branch. Create that branch once, before writing the plan or starting phase one, if it doesn't already exist. The plan and every phase then commit to that same branch.
 
 - One plan, one branch, one commit per phase. Don't create a branch per phase or stack phase branches on top of each other.
 - Name the branch for the plan (e.g. `rainforest`), not for a phase (not `rainforest/phase-3-basins`).
