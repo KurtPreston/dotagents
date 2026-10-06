@@ -35,6 +35,17 @@ Keep the default branch (`main` or `master`) linear.
 - Merge commits on feature branches are fine, such as merging `main` into a branch to pick up updates. Those branches are usually squashed when their pull request lands.
 - Always confirm before force pushing. Also confirm before any action that would later require a force push, such as rewriting commits that have already been pushed.
 
+## Recording Preferences
+
+When I state a preference about a project's style, design, or workflow that its documentation doesn't capture yet, write it into the project's best-practices or design-philosophy document. Don't keep it in an agent's private memory, where other agents and people can't see it.
+
+- Use the existing document if there is one, such as `docs/best-practices.md` or a Design section in `AGENTS.md`. Otherwise create `docs/best-practices.md`.
+- Record the preference and the reason behind it, briefly, and mention the update when reporting back.
+- If `AGENTS.md` doesn't already require it, add a line requiring agents to read the document before modifying code.
+- If a preference applies to every project rather than this one, suggest adding it to my global agent instructions instead.
+
+Before modifying code, read the project's best-practices or design-philosophy document if it has one.
+
 ## Section Comments
 
 When writing or editing code, add brief comments every 3–10 lines. Each comment should be succinct guiding text that describes what the lines below it are doing.
