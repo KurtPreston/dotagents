@@ -139,6 +139,10 @@ For each phase:
 
 Each phase should leave the branch in a passing state, so its commit can be reviewed on its own. When presenting a multi-phase plan, number the phases and identify the validation that will run between them.
 
+## Shell Commands
+
+Keep each shell command an agent runs to 20 lines or fewer. In Zed, a taller command pushes the approval button below the fold, where it can't be clicked. For longer logic, write a temporary script file and run it with a one-line command.
+
 ## Background Processes
 
 Dev servers, watchers, and other background processes can keep running for as long as a session needs them. Tear them down when the work is finished.
