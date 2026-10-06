@@ -86,6 +86,9 @@ Report back with:
 - What was done, phase by phase.
 - The branch, its commits, and the pull request link.
 - Final validation status, with output for anything that fails.
+- How the user can try the changes: the exact command, URL, example, preset, or
+  screen to open, and what to look for there. Name the best few starting
+  points when there are many.
 - Every obstacle and the workaround used.
 - Any follow-ups left out of scope.
 
@@ -112,7 +115,8 @@ The plan carries its own execution rules so they survive a long run.
   fundamental assumption is wrong or a finding reshapes the effort.
 - After the last phase: update docs and commit, delete this file and commit,
   open a pull request (draft where supported; ask first unless the repository
-  is the user's own), then report results with every obstacle and workaround.
+  is the user's own), then report results with every obstacle and workaround,
+  and how the user can try the changes.
 
 ## Validation
 
