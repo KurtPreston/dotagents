@@ -27,6 +27,14 @@ Ask before:
 
 Local work such as editing files and creating local commits does not need approval. Approval for one post doesn't extend to the next; ask again for each new action, and show the exact content you intend to post.
 
+## Git History
+
+Keep the default branch (`main` or `master`) linear.
+
+- When bringing a branch into the default branch, rebase it and fast-forward rather than creating a merge commit.
+- Merge commits on feature branches are fine, such as merging `main` into a branch to pick up updates. Those branches are usually squashed when their pull request lands.
+- Always confirm before force pushing. Also confirm before any action that would later require a force push, such as rewriting commits that have already been pushed.
+
 ## Section Comments
 
 When writing or editing code, add brief comments every 3–10 lines. Each comment should be succinct guiding text that describes what the lines below it are doing.
