@@ -17,7 +17,8 @@ during implementation. Move on once the user agrees on scope.
 ## 2. Write the plan
 
 - Create the plan's branch, named for the plan. In grove-managed projects,
-  use `grove path BRANCH` and work in that worktree.
+  use `grove path BRANCH --from BASE` (usually `--from main`) and work in
+  that worktree. Always pass `--from`, or grove prompts for a base branch.
 - Write the plan to `PLAN-<name>.md` at the repository root, using the
   template below.
 - Commit the plan to the branch.
