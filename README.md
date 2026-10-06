@@ -77,13 +77,15 @@ The explicit object form avoids the newer `"attribution": false` shorthand, whic
 ### Ownership and merging
 
 - Repository values win for declared settings each time you install; unrelated keys, including nested keys, survive.
-- Objects merge recursively. Scalars and arrays replace the previous value; arrays do not concatenate. `null` is a literal value, not a deletion instruction.
+- Objects merge recursively. Scalars and arrays replace the previous value; arrays do not concatenate. `null` is a literal value, not a deletion instruction; this is deliberately not JSON Merge Patch (RFC 7396).
 - An overlay object conflicting with a local non-object fails with its key path. Resolve the mismatch explicitly before rerunning.
 - Removing a key from the overlay stops enforcing it but does not remove the installed value. There is no automatic pruning or uninstall restoration.
 - A missing destination is created. Existing empty files, malformed JSON, duplicate keys, nonstandard numeric constants, non-object roots, and symlink destinations (including dangling links) are rejected.
 - The helper validates JSON structure, not the application's settings schema. Keep app-specific values compatible with the versions you use. Do not commit secrets in overlays.
 
-Only Claude's strict JSON settings are supported initially. Cursor and Zed settings are untouched; JSON-with-comments files need a separate, comment-preserving editor.
+Only Claude's strict JSON settings are supported initially. Cursor and Zed settings are untouched; JSON-with-comments files need a separate, comment-preserving editor rather than the strict JSON helper.
+
+`install.sh` maps each overlay to its destination explicitly. Overlays never contain destination paths, and destinations are not inferred from overlay filenames. A future integration should confirm the app's real settings path rather than assume it sits beside the app's instructions directory.
 
 ### Backups and recovery
 
