@@ -73,7 +73,7 @@ Use multiple phases when the work involves:
 
 Single-step fixes and small changes do not need phasing.
 
-For a large effort, use the `phased-plan` skill. It covers discussing scope, writing and approving the plan, implementing it end to end, updating docs, and reporting back.
+For a large effort, use the `phased-plan` skill. It covers discussing scope, writing and approving the plan, implementing it end to end, updating docs, opening a pull request, and reporting back.
 
 ### Branch First
 

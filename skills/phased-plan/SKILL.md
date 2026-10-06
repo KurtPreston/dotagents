@@ -1,11 +1,11 @@
 ---
 name: phased-plan
-description: Plan and carry out a large, multi-phase effort end to end — discuss scope, commit a phased plan to its own branch, get approval, implement every phase, update docs, remove the plan, and report. Use when the user asks to plan a big change, or when work spans several features, subsystems, or commits.
+description: Plan and carry out a large, multi-phase effort end to end — discuss scope, commit a phased plan to its own branch, get approval, implement every phase, update docs, remove the plan, open a pull request, and report. Use when the user asks to plan a big change, or when work spans several features, subsystems, or commits.
 ---
 
 # Phased Plan
 
-A large effort moves through seven steps in order. Follow the branch, grove,
+A large effort moves through eight steps in order. Follow the branch, grove,
 and Phase Workflow rules in the standing instructions throughout.
 
 ## 1. Discuss
@@ -63,12 +63,28 @@ Update it, validate, and commit.
 Copy the plan's **Obstacles** notes into your working context for the report,
 then delete `PLAN-<name>.md` in its own commit.
 
-## 7. Report
+## 7. Open a pull request
 
-Don't push or open a pull request unless the user asks. Report back with:
+Once the effort is done and ready for review, open a pull request for the
+branch against the base branch.
+
+- If the repository is owned by the user's own account, push the branch and
+  open the pull request without asking first. This is an exception to the
+  posting rules in the standing instructions, and it covers only this push
+  and pull request.
+- If it's owned by anyone else, such as an organization or another user,
+  show the user the exact title and description and ask before pushing and
+  opening it.
+- If ownership is unclear, treat the repository as someone else's.
+- Where the host supports drafts (e.g. GitHub), open it as a draft.
+- On Gitea, open a regular pull request. Don't add a WIP prefix.
+
+## 8. Report
+
+Report back with:
 
 - What was done, phase by phase.
-- The branch and its commits.
+- The branch, its commits, and the pull request link.
 - Final validation status, with output for anything that fails.
 - Every obstacle and the workaround used.
 - Any follow-ups left out of scope.
@@ -95,7 +111,8 @@ The plan carries its own execution rules so they survive a long run.
 - Work around small obstacles and log them under Obstacles. Stop only if a
   fundamental assumption is wrong or a finding reshapes the effort.
 - After the last phase: update docs and commit, delete this file and commit,
-  then report results with every obstacle and workaround.
+  open a pull request (draft where supported; ask first unless the repository
+  is the user's own), then report results with every obstacle and workaround.
 
 ## Validation
 
