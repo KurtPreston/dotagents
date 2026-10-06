@@ -21,6 +21,9 @@ during implementation. Move on once the user agrees on scope.
   that worktree. Always pass `--from`, or grove prompts for a base branch.
 - Write the plan to `PLAN-<name>.md` at the repository root, using the
   template below.
+- If the user must do anything by hand, such as generating keys, installing
+  software, approving access, or deploying, list each step under **User
+  steps**. Give the phase it happens in and the exact commands.
 - Commit the plan to the branch.
 
 ## 3. Confirm
@@ -121,6 +124,11 @@ The plan carries its own execution rules so they survive a long run.
 ## Validation
 
 <The project's lint, test, and type-check commands.>
+
+## User steps
+
+<Anything the user must do by hand, such as keys, installs, approvals, or
+deploys: the phase each happens in, and the exact commands. Omit if none.>
 
 ## Phases
 
