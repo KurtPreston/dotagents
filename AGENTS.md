@@ -83,6 +83,8 @@ Single-step fixes and small changes do not need phasing.
 
 For a large effort, use the `phased-plan` skill. It covers discussing scope, writing and approving the plan, implementing it end to end, updating docs, opening a pull request, and reporting back.
 
+When the user wants to continue work in a new session, such as executing a plan with a fresh context, use the `handoff` skill to write a prompt they can paste.
+
 ### Branch First
 
 If a plan has multiple phases and therefore multiple commits, do the whole plan on one branch rather than directly on the default branch. Create that branch once, before writing the plan or starting phase one, if it doesn't already exist. The plan and every phase then commit to that same branch.
