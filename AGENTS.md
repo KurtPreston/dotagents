@@ -16,9 +16,11 @@ If attribution is controlled by a tool or setting, leave it disabled.
 
 ## Posting on My Behalf
 
-Never post, publish, or send anything on my behalf without asking first. This applies even when the action seems implied by the task.
+Never post, publish, or send anything on my behalf without asking first in a public or collaborative place. This applies even when the action seems implied by the task.
 
-Ask before:
+My own private repositories are the exception. In a repository my account owns, that is private, and that no one else works in, push branches and open, update, or comment on pull requests and issues without asking. The posting rules here are there because others see what's posted, and in a private repository of my own only I do. The other rules still apply there, such as confirming before a force push. If you can't tell whether a repository is private and mine alone, treat it as collaborative and ask.
+
+In public or collaborative places, ask before:
 
 - Creating, editing, or deleting comments, reviews, or reactions on issues, pull requests, or discussions.
 - Opening, updating, merging, closing, or reopening pull requests or issues, including changing titles, descriptions, labels, or reviewers.
