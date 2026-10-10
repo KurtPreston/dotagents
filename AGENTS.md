@@ -113,10 +113,11 @@ When the user wants to continue work in a new session, such as executing a plan 
 
 ### Branch First
 
-If a plan has multiple phases and therefore multiple commits, do the whole plan on one branch rather than directly on the default branch. Create that branch once, before writing the plan or starting phase one, if it doesn't already exist. The plan and every phase then commit to that same branch.
+If a plan has multiple phases and therefore multiple commits, do the whole plan on one branch rather than directly on the default branch. If you're on the default branch, create that branch once, before writing the plan or starting phase one. If you're already on another branch, the plan most likely belongs there, so use it. The plan and every phase then commit to that same branch.
 
 - One plan, one branch, one commit per phase. Don't create a branch per phase or stack phase branches on top of each other.
 - Name the branch for the plan (e.g. `rainforest`), not for a phase (not `rainforest/phase-3-basins`).
+- Prefix each commit message with the branch name rather than a phase number, e.g. `rainforest: Add basin erosion` instead of `Phase 3: Add basin erosion`.
 - When writing a plan document for another agent to implement, state this rule as-is. Don't restate it as "each phase goes on its own branch."
 
 ### Grove-Managed Projects

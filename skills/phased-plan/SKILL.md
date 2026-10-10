@@ -1,6 +1,6 @@
 ---
 name: phased-plan
-description: Plan and carry out a large, multi-phase effort end to end — discuss scope, commit a phased plan to its own branch, get approval, implement every phase, update docs, remove the plan, open a pull request, and report. Use when the user asks to plan a big change, or when work spans several features, subsystems, or commits.
+description: Plan and carry out a large, multi-phase effort end to end — discuss scope, commit a phased plan to the effort's branch, get approval, implement every phase, update docs, remove the plan, open a pull request, and report. Use when the user asks to plan a big change, or when work spans several features, subsystems, or commits.
 ---
 
 # Phased Plan
@@ -16,9 +16,15 @@ during implementation. Move on once the user agrees on scope.
 
 ## 2. Write the plan
 
-- Create the plan's branch, named for the plan. In grove-managed projects,
-  use `grove path BRANCH --from BASE` (usually `--from main`) and work in
-  that worktree. Always pass `--from`, or grove prompts for a base branch.
+- Give the effort a short kebab-case name, such as `stock-perf`. The name is
+  also the branch name and the commit message prefix.
+- If you're on the default branch (`main` or `master`), create a branch with
+  the effort's name. In grove-managed projects, use
+  `grove path BRANCH --from BASE` (usually `--from main`) and work in that
+  worktree. Always pass `--from`, or grove prompts for a base branch.
+- If you're already on another branch, the effort most likely belongs there.
+  Stay on it and use the branch name as the effort's name. Ask only if the
+  branch's existing work looks unrelated.
 - Write the plan to `PLAN-<name>.md` at the repository root, using the
   template below.
 - If the user must do anything by hand, such as generating keys, installing
@@ -37,6 +43,11 @@ again.
 Once approved, carry out every phase to completion without stopping for
 check-ins between phases. For each phase: implement only its scope, run the
 project's lint, tests, and type checks, fix failures, and commit.
+
+Prefix every commit message in the effort with its name instead of a phase
+number, such as `stock-perf: Add unit tests for quote cache` rather than
+`Phase 1: Add unit tests`. This includes the plan, docs, and plan-removal
+commits.
 
 Reread `PLAN-<name>.md` at the start of each phase. It's the source of truth
 if earlier conversation context has been summarized away.
@@ -113,6 +124,7 @@ The plan carries its own execution rules so they survive a long run.
 ## Execution rules
 
 - All work happens on the `<name>` branch. One plan, one branch, one commit per phase.
+- Prefix every commit message with `<name>: `.
 - For each phase: implement only its scope, run validation, fix failures, commit.
 - Work around small obstacles and log them under Obstacles. Stop only if a
   fundamental assumption is wrong or a finding reshapes the effort.
