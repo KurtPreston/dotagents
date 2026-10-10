@@ -82,14 +82,13 @@ then delete `PLAN-<name>.md` in its own commit.
 Once the effort is done and ready for review, open a pull request for the
 branch against the base branch.
 
-- If the repository is owned by the user's own account, push the branch and
-  open the pull request without asking first. This is an exception to the
-  posting rules in the standing instructions, and it covers only this push
-  and pull request.
-- If it's owned by anyone else, such as an organization or another user,
-  show the user the exact title and description and ask before pushing and
-  opening it.
-- If ownership is unclear, treat the repository as someone else's.
+- If the repository is private and only the user's (owned by their account,
+  no one else working in it), push the branch and open the pull request
+  without asking first, as the standing instructions allow there.
+- If it's public, or owned by or shared with anyone else, such as an
+  organization or another user, show the user the exact title and
+  description and ask before pushing and opening it.
+- If that's unclear, treat the repository as public or shared.
 - Where the host supports drafts (e.g. GitHub), open it as a draft.
 - On Gitea, open a regular pull request. Don't add a WIP prefix.
 
@@ -130,7 +129,7 @@ The plan carries its own execution rules so they survive a long run.
   fundamental assumption is wrong or a finding reshapes the effort.
 - After the last phase: update docs and commit, delete this file and commit,
   open a pull request (draft where supported; ask first unless the repository
-  is the user's own), then report results with every obstacle and workaround,
+  is private and the user's alone), then report results with every obstacle and workaround,
   and how the user can try the changes.
 
 ## Validation
