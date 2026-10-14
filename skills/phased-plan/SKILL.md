@@ -1,11 +1,11 @@
 ---
 name: phased-plan
-description: Plan and carry out a large, multi-phase effort end to end — discuss scope, commit a phased plan to the effort's branch, get approval, implement every phase, update docs, remove the plan, open a pull request, and report. Use when the user asks to plan a big change, or when work spans several features, subsystems, or commits.
+description: Plan and carry out a large, multi-phase effort end to end — discuss scope, commit a phased plan to the effort's branch, get approval, implement every phase, update docs, remove the plan, open a pull request, fix unrelated bugs found along the way on their own branches, and report. Use when the user asks to plan a big change, or when work spans several features, subsystems, or commits.
 ---
 
 # Phased Plan
 
-A large effort moves through eight steps in order. Follow the branch, grove,
+A large effort moves through nine steps in order. Follow the branch, grove,
 and Phase Workflow rules in the standing instructions throughout.
 
 ## 1. Discuss
@@ -66,6 +66,22 @@ Stop and check back with the user only when:
 When stopping, explain the finding, what has been committed so far, and how
 you propose to proceed.
 
+### Handling bugs found along the way
+
+When you notice an existing bug the plan didn't call for, sort it into one of
+three cases and log it under the plan's **Found bugs** section with the case
+chosen:
+
+- **Part of the effort.** The bug sits in code the plan is changing, or fixing
+  it reasonably falls under the effort's goal. Fold the fix into the branch,
+  either in the phase it touches or as its own prefixed commit.
+- **Separate and straightforward.** The bug is unrelated to the effort, but
+  the fix is small and clear. Fix it on its own branch in step 8 rather than
+  on this one.
+- **Needs discussion.** The bug is nuanced, the right fix is unclear, or it
+  involves a design or behavior decision. Don't fix it. Describe it in the
+  log and raise it in the report.
+
 ## 5. Update docs
 
 After the last phase, review the repository for documentation the changes made
@@ -74,8 +90,8 @@ Update it, validate, and commit.
 
 ## 6. Remove the plan
 
-Copy the plan's **Obstacles** notes into your working context for the report,
-then delete `PLAN-<name>.md` in its own commit.
+Copy the plan's **Obstacles** and **Found bugs** notes into your working
+context for the report, then delete `PLAN-<name>.md` in its own commit.
 
 ## 7. Open a pull request
 
@@ -92,7 +108,22 @@ branch against the base branch.
 - Where the host supports drafts (e.g. GitHub), open it as a draft.
 - On Gitea, open a regular pull request. Don't add a WIP prefix.
 
-## 8. Report
+## 8. Fix separate bugs
+
+For each bug logged as separate and straightforward, fix it on its own branch
+and pull request, independent of the effort:
+
+- Give the fix a short kebab-case name, such as `quote-rounding`, and branch
+  from the base branch, not the effort's branch. In grove-managed projects,
+  use `grove path BRANCH --from BASE` and work in that worktree.
+- Keep the change to that one bug. Run validation, fix failures, and commit
+  with the fix's name as the prefix.
+- Open a pull request following the same rules as step 7.
+
+If a fix turns out to be less straightforward than it looked, drop the branch
+and treat the bug as needing discussion instead.
+
+## 9. Report
 
 Report back with:
 
@@ -103,6 +134,9 @@ Report back with:
   screen to open, and what to look for there. Name the best few starting
   points when there are many.
 - Every obstacle and the workaround used.
+- Every bug found: those folded into the effort, those fixed separately with
+  their branches and pull request links, and those that need discussion, with
+  enough detail to decide what to do.
 - Any follow-ups left out of scope.
 
 ## Plan template
@@ -127,9 +161,14 @@ The plan carries its own execution rules so they survive a long run.
 - For each phase: implement only its scope, run validation, fix failures, commit.
 - Work around small obstacles and log them under Obstacles. Stop only if a
   fundamental assumption is wrong or a finding reshapes the effort.
+- Log existing bugs found along the way under Found bugs. Fold in fixes that
+  belong to this effort, save small unrelated fixes for their own branches,
+  and leave nuanced ones unfixed for discussion.
 - After the last phase: update docs and commit, delete this file and commit,
   open a pull request (draft where supported; ask first unless the repository
-  is private and the user's alone), then report results with every obstacle and workaround,
+  is private and the user's alone), fix each small unrelated bug on its own
+  branch from the base branch with its own pull request, then report results
+  with every obstacle and workaround, every bug found and how it was handled,
   and how the user can try the changes.
 
 ## Validation
@@ -154,4 +193,9 @@ deploys: the phase each happens in, and the exact commands. Omit if none.>
 ## Obstacles
 
 <Filled in during implementation: obstacle, then workaround.>
+
+## Found bugs
+
+<Filled in during implementation: each existing bug noticed, and whether it
+was folded in, saved for its own branch, or left for discussion.>
 ```
