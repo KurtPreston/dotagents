@@ -54,6 +54,8 @@ class InstallTests(unittest.TestCase):
         (self.bin / "python3").symlink_to(sys.executable)
         self.env = {name: str(path) for name, path in self.homes.items()}
         self.env["PATH"] = str(self.bin)
+        # Apple's Python otherwise caches bytecode under the fixture HOME.
+        self.env["PYTHONDONTWRITEBYTECODE"] = "1"
 
     def install(self, *targets, success=True):
         result = subprocess.run(
