@@ -4,30 +4,54 @@ These instructions apply to all coding sessions.
 
 ## Attribution
 
-Do not add agent attribution to commits or pull requests.
+Do not advertise agents or tools in commits or pull requests.
 
 When creating commits or pull requests:
 
 - Do not add `Co-authored-by` trailers for Cursor, Claude, Zed, Copilot, or another agent.
-- Do not add "Made with" footers, badges, or similar agent attribution to commit messages or pull request descriptions.
+- Do not add "Made with" footers, badges, or similar tool branding to commit messages or pull request descriptions.
 - Do not enable or suggest agent attribution settings.
 
 If attribution is controlled by a tool or setting, leave it disabled.
 
+This is separate from disclosure. Where [Posting on My Behalf](#posting-on-my-behalf) requires it, label prose you write with 🤖, without naming the tool.
+
 ## Posting on My Behalf
 
-Never post, publish, or send anything on my behalf without asking first in a public or collaborative place. This applies even when the action seems implied by the task.
+How much to ask first depends on who can see a post. Local work such as editing files and creating local commits never needs approval.
 
-My own private repositories are the exception. In a repository my account owns, that is private, and that no one else works in, push branches and open, update, or comment on pull requests and issues without asking. The posting rules here are there because others see what's posted, and in a private repository of my own only I do. The other rules still apply there, such as confirming before a force push. If you can't tell whether a repository is private and mine alone, treat it as collaborative and ask.
+### Non-public repositories: proceed on my own work
 
-In public or collaborative places, ask before:
+In a repository whose visibility is private or internal, act on my own branches and pull requests without asking:
+
+- Push branches created for the task, never the default branch.
+- Open my pull requests, and update their commits, titles, and descriptions.
+- Reply to and resolve review threads on my pull requests, and request re-review from automated reviewers.
+
+Label everything you write there for others to read, such as pull request descriptions, comments, and replies. Start it with 🤖 so readers see who wrote it first, including in notifications and previews.
+
+Label only prose you wrote. If I rewrite it substantially, it's mine and loses the label. Skip the label in a private repository that only I work in, since no one else reads it. Commit messages and pull request titles don't take the label, since they end up in history and changelogs.
+
+Even in non-public repositories, ask before:
+
+- Force pushing, as described in [Git History](#git-history).
+- Merging, closing, or reopening pull requests, or acting on the default branch.
+- Acting on other people's work: reviewing, approving, commenting on, or editing their pull requests and issues.
+- Notifying people: requesting human reviewers, assigning, or @-mentioning someone.
+- Opening issues, or deleting anything you didn't create.
+
+### Public repositories and everywhere else: ask first
+
+In public repositories, and when sending messages, emails, or chat posts anywhere, never post, publish, or send anything without asking first, even when the action seems implied by the task. Ask before:
 
 - Creating, editing, or deleting comments, reviews, or reactions on issues, pull requests, or discussions.
 - Opening, updating, merging, closing, or reopening pull requests or issues, including changing titles, descriptions, labels, or reviewers.
 - Pushing commits or branches, or creating releases and tags on a remote.
 - Sending messages, emails, or chat posts, or publishing to any external service.
 
-Local work such as editing files and creating local commits does not need approval. Approval for one post doesn't extend to the next; ask again for each new action, and show the exact content you intend to post.
+Approval for one post doesn't extend to the next. Ask again for each new action, and show the exact content you intend to post.
+
+Check a repository's visibility with `gh repo view --json visibility` rather than guessing. If you can't determine it, treat it as public.
 
 ## Git History
 

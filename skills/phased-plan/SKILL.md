@@ -98,13 +98,12 @@ context for the report, then delete `PLAN-<name>.md` in its own commit.
 Once the effort is done and ready for review, open a pull request for the
 branch against the base branch.
 
-- If the repository is private and only the user's (owned by their account,
-  no one else working in it), push the branch and open the pull request
-  without asking first, as the standing instructions allow there.
-- If it's public, or owned by or shared with anyone else, such as an
-  organization or another user, show the user the exact title and
-  description and ask before pushing and opening it.
-- If that's unclear, treat the repository as public or shared.
+- If the repository is private or internal, push the branch and open the
+  pull request without asking first, starting the description with 🤖, as
+  the standing instructions allow there.
+- If it's public, show the user the exact title and description and ask
+  before pushing and opening it.
+- If visibility is unclear, treat the repository as public.
 - Where the host supports drafts (e.g. GitHub), open it as a draft.
 - On Gitea, open a regular pull request. Don't add a WIP prefix.
 
@@ -165,8 +164,8 @@ The plan carries its own execution rules so they survive a long run.
   belong to this effort, save small unrelated fixes for their own branches,
   and leave nuanced ones unfixed for discussion.
 - After the last phase: update docs and commit, delete this file and commit,
-  open a pull request (draft where supported; ask first unless the repository
-  is private and the user's alone), fix each small unrelated bug on its own
+  open a pull request (draft where supported; ask first only if the
+  repository is public), fix each small unrelated bug on its own
   branch from the base branch with its own pull request, then report results
   with every obstacle and workaround, every bug found and how it was handled,
   and how the user can try the changes.
