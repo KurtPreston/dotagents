@@ -8,7 +8,7 @@ Do not add agent attribution to commits or pull requests.
 
 When creating commits or pull requests:
 
-- Do not add `Co-authored-by` trailers for Cursor, Claude, Zed, or another agent.
+- Do not add `Co-authored-by` trailers for Cursor, Claude, Zed, Copilot, or another agent.
 - Do not add "Made with" footers, badges, or similar agent attribution to commit messages or pull request descriptions.
 - Do not enable or suggest agent attribution settings.
 

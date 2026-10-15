@@ -16,6 +16,7 @@ EXPECTED_SETTINGS = {
     "env": {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
             "DISABLE_FEEDBACK_COMMAND": "1"},
 }
+EXPECTED_COPILOT_SETTINGS = {"includeCoAuthoredBy": False}
 
 
 @unittest.skipUnless(BASH, "installer integration tests require bash")
@@ -28,7 +29,7 @@ class InstallTests(unittest.TestCase):
         self.repo = self.root / "repository fixture"
         self.repo.mkdir()
         for name in ("install.sh", "AGENTS.md", "scripts/merge-settings.py",
-                     "settings/claude.json"):
+                     "settings/claude.json", "settings/copilot.json"):
             destination = self.repo / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(REPO_ROOT / name, destination)
@@ -40,9 +41,12 @@ class InstallTests(unittest.TestCase):
             "---\nname: test-skill\ndescription: Installer fixture\n---\nTest skill.\n",
             encoding="utf-8")
         self.homes = {name: self.root / name.lower() for name in (
-            "HOME", "CURSOR_HOME", "ZED_HOME", "CLAUDE_HOME", "AGENTS_HOME")}
+            "HOME", "CURSOR_HOME", "ZED_HOME", "CLAUDE_HOME", "COPILOT_HOME",
+            "AGENTS_HOME")}
         self.settings = self.homes["CLAUDE_HOME"] / "settings.json"
         self.overlay = self.repo / "settings" / "claude.json"
+        self.copilot_settings = self.homes["COPILOT_HOME"] / "settings.json"
+        self.copilot_overlay = self.repo / "settings" / "copilot.json"
 
         # An allowlisted PATH makes missing-Python tests independent of the host.
         self.bin = self.root / "bin"
@@ -114,7 +118,7 @@ class InstallTests(unittest.TestCase):
         else:
             self.assertFalse(zed.exists())
         shared = self.homes["AGENTS_HOME"]
-        if "cursor" in targets or "zed" in targets:
+        if {"cursor", "zed", "copilot"} & set(targets):
             self.assert_link(shared / "skills" / "test-skill", self.skill)
         else:
             self.assertFalse(shared.exists())
@@ -127,26 +131,54 @@ class InstallTests(unittest.TestCase):
             self.assertEqual(json.loads(self.settings.read_bytes()), EXPECTED_SETTINGS)
         else:
             self.assertFalse(claude.exists())
+
+        copilot = self.homes["COPILOT_HOME"]
+        if "copilot" in targets:
+            self.assert_link(copilot / "copilot-instructions.md", self.repo / "AGENTS.md")
+            self.assertFalse(self.copilot_settings.is_symlink())
+            self.assertEqual(json.loads(self.copilot_settings.read_bytes()),
+                             EXPECTED_COPILOT_SETTINGS)
+        else:
+            self.assertFalse(copilot.exists())
         self.assertFalse(self.homes["HOME"].exists(), "all home overrides must be honored")
 
     def test_default_installs_all_integrations(self):
         self.install()
-        self.assert_installed("cursor", "zed", "claude")
+        self.assert_installed("cursor", "zed", "claude", "copilot")
         self.assertEqual(list(self.settings.parent.glob("settings.json.*.bak")), [])
+        self.assertEqual(list(self.copilot_settings.parent.glob("settings.json.*.bak")), [])
 
     def test_claude_only_installs_instructions_skills_and_settings(self):
         self.install("claude")
         self.assert_installed("claude")
 
-    def test_cursor_only_does_not_require_python_or_valid_claude_overlay(self):
+    def test_copilot_only_installs_instructions_skills_and_settings(self):
+        self.overlay.write_text("not JSON", encoding="utf-8")
+        self.install("copilot")
+        self.assert_installed("copilot")
+
+    def test_copilot_preserves_local_settings(self):
+        # Copilot owns most of its settings; only the declared key is enforced.
+        self.copilot_settings.parent.mkdir()
+        self.copilot_settings.write_bytes(
+            b'{"includeCoAuthoredBy": true, "theme": "dark"}\n')
+        self.install("copilot")
+        self.assertEqual(json.loads(self.copilot_settings.read_bytes()),
+                         {"includeCoAuthoredBy": False, "theme": "dark"})
+        backups = list(self.copilot_settings.parent.glob("settings.json.*.bak"))
+        self.assertEqual(len(backups), 1)
+
+    def test_cursor_only_does_not_require_python_or_valid_overlays(self):
         (self.bin / "python3").unlink()
         self.overlay.write_text("not JSON", encoding="utf-8")
+        self.copilot_overlay.write_text("not JSON", encoding="utf-8")
         self.install("cursor")
         self.assert_installed("cursor")
 
-    def test_zed_only_does_not_require_python_or_claude_overlay(self):
+    def test_zed_only_does_not_require_python_or_overlays(self):
         (self.bin / "python3").unlink()
         self.overlay.unlink()
+        self.copilot_overlay.unlink()
         self.install("zed")
         self.assert_installed("zed")
 
@@ -205,7 +237,8 @@ class InstallTests(unittest.TestCase):
     def test_missing_python_fails_before_any_selected_integration(self):
         (self.bin / "python3").unlink()
         self.assertIsNone(shutil.which("python3", path=self.env["PATH"]))
-        for targets in ((), ("claude",), ("cursor", "zed", "claude")):
+        for targets in ((), ("claude",), ("copilot",), ("cursor", "zed", "claude"),
+                        ("cursor", "copilot")):
             with self.subTest(targets=targets):
                 result = self.assert_preflight_failure(*targets)
                 self.assertIn("python3", result.stderr.lower())
@@ -226,6 +259,22 @@ class InstallTests(unittest.TestCase):
                 self.assert_preflight_failure()
         self.overlay.unlink()
         self.assert_preflight_failure()
+
+    def test_invalid_copilot_settings_fail_before_any_integration(self):
+        # Copilot is checked after Claude, so Claude must not be applied first.
+        self.copilot_settings.parent.mkdir()
+        for raw in (b"", b"{", b"[]", b'// comment\n{}', b'{"a": 1, "a": 2}'):
+            with self.subTest(raw=raw):
+                self.copilot_settings.write_bytes(raw)
+                self.assert_preflight_failure()
+                self.assert_preflight_failure("copilot")
+        self.copilot_settings.unlink()
+
+        # A broken repository overlay also stops installation up front.
+        self.copilot_overlay.write_bytes(b"{")
+        self.assert_preflight_failure()
+        self.copilot_overlay.unlink()
+        self.assert_preflight_failure("copilot")
 
     def test_settings_directory_is_rejected_before_installation(self):
         self.settings.mkdir(parents=True)
@@ -253,7 +302,8 @@ class InstallTests(unittest.TestCase):
         for target, path in (
                 ("cursor", self.homes["CURSOR_HOME"] / "rules" / "dotagents.mdc"),
                 ("zed", self.homes["ZED_HOME"] / "AGENTS.md"),
-                ("claude", self.homes["CLAUDE_HOME"] / "CLAUDE.md")):
+                ("claude", self.homes["CLAUDE_HOME"] / "CLAUDE.md"),
+                ("copilot", self.homes["COPILOT_HOME"] / "copilot-instructions.md")):
             with self.subTest(target=target):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"User-managed instructions.\n")
@@ -262,12 +312,14 @@ class InstallTests(unittest.TestCase):
                 self.assertFalse(path.is_symlink())
                 self.assertEqual(path.read_bytes(), b"User-managed instructions.\n")
                 self.assertFalse(self.settings.exists())
+                self.assertFalse(self.copilot_settings.exists())
 
     def test_user_managed_skill_directories_are_not_replaced(self):
-        for target, home in (("cursor", "AGENTS_HOME"), ("claude", "CLAUDE_HOME")):
+        for target, home in (("cursor", "AGENTS_HOME"), ("claude", "CLAUDE_HOME"),
+                             ("copilot", "AGENTS_HOME")):
             with self.subTest(target=target):
                 skill = self.homes[home] / "skills" / "test-skill"
-                skill.mkdir(parents=True)
+                skill.mkdir(parents=True, exist_ok=True)
                 local = skill / "SKILL.md"
                 local.write_bytes(b"Local skill.\n")
                 result = self.install(target, success=False)
@@ -275,7 +327,7 @@ class InstallTests(unittest.TestCase):
                 self.assertFalse(skill.is_symlink())
                 self.assertEqual(local.read_bytes(), b"Local skill.\n")
 
-    def test_helper_check_precedes_mutations_and_apply_follows_claude_link(self):
+    def test_helper_checks_precede_mutations_and_applies_follow_links(self):
         # Instrument only the fixture helper, retaining the real merge implementation.
         helper = self.repo / "scripts" / "merge-settings.py"
         helper.rename(helper.with_name("real-merge-settings.py"))
@@ -284,28 +336,37 @@ class InstallTests(unittest.TestCase):
         helper.write_text(
             "import json, os, pathlib, runpy, sys\n"
             "homes = [pathlib.Path(os.environ[name]) for name in "
-            "('HOME', 'CURSOR_HOME', 'ZED_HOME', 'CLAUDE_HOME', 'AGENTS_HOME')]\n"
+            "('HOME', 'CURSOR_HOME', 'ZED_HOME', 'CLAUDE_HOME', 'COPILOT_HOME', "
+            "'AGENTS_HOME')]\n"
             "record = {'args': sys.argv[1:], 'homes_exist': [p.exists() for p in homes], "
-            "'claude_link': (homes[3] / 'CLAUDE.md').is_symlink()}\n"
+            "'claude_link': (homes[3] / 'CLAUDE.md').is_symlink(), "
+            "'copilot_link': (homes[4] / 'copilot-instructions.md').is_symlink()}\n"
             "with open(os.environ['INSTALL_TEST_LOG'], 'a') as stream:\n"
             "    stream.write(json.dumps(record) + '\\n')\n"
             "runpy.run_path(str(pathlib.Path(__file__).with_name('real-merge-settings.py')), "
             "run_name='__main__')\n", encoding="utf-8")
 
-        # The check must be read-only even when earlier selected agents have adapters.
+        # Both checks run read-only before any agent home exists.
         self.install()
         calls = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
-        self.assertEqual(len(calls), 2)
-        self.assertIn("--check", calls[0]["args"])
-        self.assertEqual(calls[0]["homes_exist"], [False] * len(self.homes))
-        self.assertFalse(calls[0]["claude_link"])
-        self.assertNotIn("--check", calls[1]["args"])
-        self.assertTrue(calls[1]["claude_link"])
-        for call in calls:
-            self.assertIn(str(self.overlay), call["args"])
-            self.assertIn(str(self.settings), call["args"])
-        self.assert_installed("cursor", "zed", "claude")
+        self.assertEqual(len(calls), 4)
+        for call in calls[:2]:
+            self.assertIn("--check", call["args"])
+            self.assertEqual(call["homes_exist"], [False] * len(self.homes))
+        for call in calls[2:]:
+            self.assertNotIn("--check", call["args"])
 
+        # Each apply targets its own agent and runs after that agent's link.
+        claude_calls = (calls[0], calls[2])
+        copilot_calls = (calls[1], calls[3])
+        self.assertTrue(calls[2]["claude_link"])
+        self.assertTrue(calls[3]["copilot_link"])
+        for call in claude_calls:
+            self.assertEqual(call["args"][-2:], [str(self.overlay), str(self.settings)])
+        for call in copilot_calls:
+            self.assertEqual(call["args"][-2:],
+                             [str(self.copilot_overlay), str(self.copilot_settings)])
+        self.assert_installed("cursor", "zed", "claude", "copilot")
 
 if __name__ == "__main__":
     unittest.main()

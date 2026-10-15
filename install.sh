@@ -6,34 +6,45 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CURSOR_HOME="${CURSOR_HOME:-$HOME/.cursor}"
 ZED_HOME="${ZED_HOME:-$HOME/.config/zed}"
 CLAUDE_HOME="${CLAUDE_HOME:-$HOME/.claude}"
+COPILOT_HOME="${COPILOT_HOME:-$HOME/.copilot}"
 AGENTS_HOME="${AGENTS_HOME:-$HOME/.agents}"
 
 # Default to installing every supported integration
 if [[ "$#" -eq 0 ]]; then
-  set -- cursor zed claude
+  set -- cursor zed claude copilot
 fi
 
 # Validate every target before installing any integration
 INSTALL_CLAUDE_SETTINGS=false
+INSTALL_COPILOT_SETTINGS=false
 for target in "$@"; do
   case "$target" in
     cursor|zed) ;;
     claude) INSTALL_CLAUDE_SETTINGS=true ;;
+    copilot) INSTALL_COPILOT_SETTINGS=true ;;
     *)
-      echo "error: unknown target '$target' (expected cursor, zed, or claude)" >&2
+      echo "error: unknown target '$target' (expected cursor, zed, claude, or copilot)" >&2
       exit 1
       ;;
   esac
 done
 
-# Fail before mutations when Claude settings cannot be safely merged
-if [[ "$INSTALL_CLAUDE_SETTINGS" == true ]]; then
+# Settings merges need Python before any mutation happens
+if [[ "$INSTALL_CLAUDE_SETTINGS" == true || "$INSTALL_COPILOT_SETTINGS" == true ]]; then
   if ! command -v python3 >/dev/null 2>&1; then
-    echo "error: Claude settings require Python 3; install python3 and rerun ./install.sh claude" >&2
+    echo "error: Claude and Copilot settings require Python 3; install python3 and rerun ./install.sh" >&2
     exit 1
   fi
+fi
+
+# Fail before mutations when any selected settings cannot be safely merged
+if [[ "$INSTALL_CLAUDE_SETTINGS" == true ]]; then
   python3 "$REPO_ROOT/scripts/merge-settings.py" --check \
     "$REPO_ROOT/settings/claude.json" "$CLAUDE_HOME/settings.json"
+fi
+if [[ "$INSTALL_COPILOT_SETTINGS" == true ]]; then
+  python3 "$REPO_ROOT/scripts/merge-settings.py" --check \
+    "$REPO_ROOT/settings/copilot.json" "$COPILOT_HOME/settings.json"
 fi
 
 # Track shared installation work across selected agents
@@ -106,16 +117,25 @@ install_claude() {
   INSTALL_CLAUDE_SKILLS=true
 }
 
+install_copilot() {
+  # Copilot CLI and the VS Code agent read user instructions and settings here
+  link_file "$REPO_ROOT/AGENTS.md" "$COPILOT_HOME/copilot-instructions.md"
+  python3 "$REPO_ROOT/scripts/merge-settings.py" \
+    "$REPO_ROOT/settings/copilot.json" "$COPILOT_HOME/settings.json"
+  INSTALL_SHARED_SKILLS=true
+}
+
 # Install only the explicitly selected agent integrations
 for target in "$@"; do
   case "$target" in
     cursor) install_cursor ;;
     zed) install_zed ;;
     claude) install_claude ;;
+    copilot) install_copilot ;;
   esac
 done
 
-# Cursor and Zed share the open Agent Skills location
+# Cursor, Zed, and Copilot share the open Agent Skills location
 if [[ "$INSTALL_SHARED_SKILLS" == true ]]; then
   link_skills "$AGENTS_HOME/skills"
 fi
