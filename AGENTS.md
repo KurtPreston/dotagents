@@ -120,6 +120,15 @@ When possible, put code in another language in a dedicated file instead of an in
 - Load or import the file where it's used. If it needs values filled in, use the language's templating or include mechanism, or a small project helper.
 - Short one-line snippets can stay inline when extracting them would hurt readability.
 
+## Makefiles
+
+In projects I own that use a Makefile, running `make` with no target should print help listing the targets and what each does, rather than building or running anything. Someone new to the project can type `make` to find out what's available without having to read the Makefile.
+
+- Make `help` the default goal, such as with `.DEFAULT_GOAL := help`.
+- Generate the list from the Makefile itself, such as from `## description` notes on each rule line, so it can't drift from the real targets.
+- When adding a target, give it a description so it shows up in the help.
+- Don't add a Makefile just for this. Projects that run tasks another way, such as `package.json` scripts, keep that convention.
+
 ## Phased Plans
 
 When a task is large enough to span multiple logical steps, break it into phases before implementing.
