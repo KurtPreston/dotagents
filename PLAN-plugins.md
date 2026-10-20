@@ -7,25 +7,27 @@ pluggable "dotagents plugins". A plugin is a folder under `plugins/<name>/`
 holding any of `rules/*.md`, `skills/<name>/` and `scripts/`. Each plugin can
 be its own git repo, so private content gets version control with
 `git init plugins/local`, and a team can share one with
-`git clone <repo> plugins/<team>`. The repository's own `rules/` and `skills/`
-act as the built-in core plugin.
+`git clone <repo> plugins/<team>`. The repository's own rules and skills move
+into `plugins/dotagents-defaults/`, the one plugin committed to this repo.
 
 ## Scope
 
 In:
 
-- `install.sh` discovers `plugins/*/` in name order. Rules join core first,
-  then each plugin's. Skills from core and every plugin are linked, and a
-  duplicate skill name across any two sources is an error.
+- Move `rules/` and `skills/` into `plugins/dotagents-defaults/`.
+- `install.sh` loads `dotagents-defaults` first, then every other
+  `plugins/*/` in name order. Rules join in that order. Skills from every
+  plugin are linked, and a duplicate skill name across plugins is an error.
 - Each plugin's `scripts/*` executables are linked into `$AGENTS_HOME/bin/`
   (normally `~/.agents/bin/`), and a duplicate script name is an error.
   Rules and skills call scripts at `~/.agents/bin/<script>`, a single path
   that works for every plugin and teammate, including inside symlinked
   skills. This replaces the `{{PLUGIN_ROOT}}` placeholder idea, which
   couldn't reach skills since they're symlinked rather than generated.
-- The core's own `scripts/` holds installer helpers such as
-  `merge-settings.py`, so it isn't linked into `bin/`.
-- Git ignores `/plugins/`. No placeholder folders.
+- `scripts/merge-settings.py` and `settings/` stay at the repo root: they're
+  installer internals, not agent tools.
+- Git ignores `/plugins/*` except `/plugins/dotagents-defaults/`. No
+  placeholder folders.
 - Remove `rules-local/` and `skills-local/` support outright, with no fallback.
 - Port the current local rules, skills and scripts into a new
   `plugins/local` git repo.
@@ -64,16 +66,19 @@ bash -n install.sh
 
 ### Phase 1: Load rules and skills from plugins
 
-- `install.sh`: collect `plugins/*/` in name order; generate `AGENTS.md`
-  from `rules/*.md` and then each plugin's `rules/*.md`; link skills from
-  `skills/` and each plugin's `skills/`; fail before any changes on a
-  duplicate skill name, naming both sources.
+- `git mv rules skills plugins/dotagents-defaults/`.
+- `install.sh`: collect `dotagents-defaults` then other `plugins/*/` in name
+  order (error if `dotagents-defaults` has no rules); generate `AGENTS.md`
+  from each plugin's `rules/*.md` in that order; link each plugin's
+  `skills/`; fail before any changes on a duplicate skill name, naming both
+  plugins.
 - Drop every `rules-local/` and `skills-local/` code path, and update the
   `AGENTS.md` marker and error text to mention plugins.
-- `.gitignore`: replace the `rules-local`/`skills-local` entries with `/plugins/`.
+- `.gitignore`: replace the `rules-local`/`skills-local` entries with
+  `/plugins/*` and `!/plugins/dotagents-defaults/`.
 - Update `tests/test_install.py`: plugin rules ordering across two plugins,
-  plugin skills linking, and duplicate-skill conflicts (core vs plugin and
-  plugin vs plugin).
+  defaults loading first regardless of name, plugin skills linking, and
+  duplicate-skill conflicts.
 - Done when validation passes.
 
 ### Phase 2: Link plugin scripts into ~/.agents/bin
