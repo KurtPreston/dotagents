@@ -367,6 +367,28 @@ class InstallTests(unittest.TestCase):
                 self.assertFalse(skill.is_symlink())
                 self.assertEqual(local.read_bytes(), b"Local skill.\n")
 
+    def add_local_skill(self, name):
+        skill = self.repo / "skills-local" / name
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: Local fixture\n---\nLocal skill.\n",
+            encoding="utf-8")
+        return skill
+
+    def test_local_skills_are_linked_beside_shared_skills(self):
+        local = self.add_local_skill("local-skill")
+        self.install()
+        self.assert_installed("cursor", "zed", "claude", "copilot")
+        for home in ("AGENTS_HOME", "CLAUDE_HOME"):
+            with self.subTest(home=home):
+                self.assert_link(self.homes[home] / "skills" / "local-skill", local)
+
+    def test_local_skill_shadowing_shared_skill_fails_before_installation(self):
+        self.add_local_skill("test-skill")
+        result = self.assert_preflight_failure()
+        self.assertIn("skills-local/test-skill", result.stderr)
+        self.assertFalse(self.agents.exists())
+
     def test_helper_checks_precede_mutations_and_applies_follow_links(self):
         # Instrument only the fixture helper, retaining the real merge implementation.
         helper = self.repo / "scripts" / "merge-settings.py"
