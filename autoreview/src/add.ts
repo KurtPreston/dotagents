@@ -6,7 +6,6 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { stdin, stdout } from "node:process";
-import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { CONFIG_FILE, DEFAULTS } from "./config.ts";
@@ -129,27 +128,54 @@ async function writeNew(path: string, text: string, log: (message: string) => vo
 
 /** Ask for each secret without echoing it, or take it from the environment. */
 async function askSecrets(): Promise<AddOptions["secrets"]> {
+  if (!stdin.isTTY) {
+    throw new Error(`--secrets asks in a terminal; otherwise set ${SECRETS.join(", ")}`);
+  }
   const secrets: AddOptions["secrets"] = {};
-  const prompt = createInterface({ input: stdin, output: stdout, terminal: true });
-  const muted = prompt as unknown as { _writeToOutput: (text: string) => void };
-  try {
-    for (const name of SECRETS) {
-      if (process.env[name]) {
-        secrets[name] = process.env[name];
-        continue;
-      }
-
-      // Hide what's typed after the question
-      stdout.write(`${name} (empty to skip): `);
-      muted._writeToOutput = () => {};
-      secrets[name] = (await prompt.question("")).trim();
-      muted._writeToOutput = (text) => stdout.write(text);
-      stdout.write("\n");
-    }
-  } finally {
-    prompt.close();
+  for (const name of SECRETS) {
+    secrets[name] = process.env[name] || (await askHidden(`${name} (empty to skip): `)).trim();
   }
   return secrets;
+}
+
+/** Read one line from the terminal without showing what's typed. */
+export function askHidden(question: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // Raw mode hands over each keypress, unechoed
+    stdout.write(question);
+    stdin.setRawMode(true);
+    stdin.setEncoding("utf8");
+    stdin.resume();
+    let value = "";
+    const finish = () => {
+      stdin.off("data", onData);
+      stdin.setRawMode(false);
+      stdin.pause();
+      stdout.write("\n");
+    };
+
+    // Enter ends the line, Ctrl-C cancels, backspace deletes
+    const onData = (chunk: string) => {
+      for (const char of chunk) {
+        if (char === "\r" || char === "\n") {
+          finish();
+          resolve(value);
+          return;
+        }
+        if (char === "\u0003") {
+          finish();
+          reject(new Error("cancelled"));
+          return;
+        }
+        if (char === "\u007f" || char === "\b") {
+          value = value.slice(0, -1);
+        } else if (char >= " ") {
+          value += char;
+        }
+      }
+    };
+    stdin.on("data", onData);
+  });
 }
 
 async function main(): Promise<void> {
