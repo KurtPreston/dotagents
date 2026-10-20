@@ -78,6 +78,28 @@ for plugin in "${PLUGINS[@]}"; do
     SKILL_PLUGINS+=("$(basename "$plugin")")
   done
 done
+
+# Collect every plugin's executable scripts, failing before mutations on a duplicate name
+SCRIPT_NAMES=()
+SCRIPT_SOURCES=()
+SCRIPT_PLUGINS=()
+for plugin in "${PLUGINS[@]}"; do
+  for source in "$plugin"/scripts/*; do
+    if [[ ! -f "$source" || ! -x "$source" ]]; then
+      continue
+    fi
+    script="$(basename "$source")"
+    for i in ${SCRIPT_NAMES[@]+"${!SCRIPT_NAMES[@]}"}; do
+      if [[ "${SCRIPT_NAMES[$i]}" == "$script" ]]; then
+        echo "error: script '$script' is in both plugins/${SCRIPT_PLUGINS[$i]} and plugins/$(basename "$plugin") — rename one of them" >&2
+        exit 1
+      fi
+    done
+    SCRIPT_NAMES+=("$script")
+    SCRIPT_SOURCES+=("$source")
+    SCRIPT_PLUGINS+=("$(basename "$plugin")")
+  done
+done
 shopt -u nullglob
 
 # Marks AGENTS.md as generated so hand-written files are never replaced; matched by prefix
@@ -213,5 +235,10 @@ fi
 if [[ "$INSTALL_CLAUDE_SKILLS" == true ]]; then
   link_skills "$CLAUDE_HOME/skills"
 fi
+
+# Plugin scripts share one stable path that rules and skills can call
+for i in ${SCRIPT_NAMES[@]+"${!SCRIPT_NAMES[@]}"}; do
+  link_file "${SCRIPT_SOURCES[$i]}" "$AGENTS_HOME/bin/${SCRIPT_NAMES[$i]}"
+done
 
 echo "done"

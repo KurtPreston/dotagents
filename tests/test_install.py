@@ -412,6 +412,43 @@ class InstallTests(unittest.TestCase):
                 for skill in added:
                     shutil.rmtree(skill)
 
+    def add_script(self, plugin, name, executable=True):
+        script = self.plugins / plugin / "scripts" / name
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text("#!/bin/sh\necho " + name + "\n", encoding="utf-8")
+        script.chmod(0o755 if executable else 0o644)
+        return script
+
+    def test_plugin_scripts_are_linked_into_agents_bin(self):
+        # Every target links scripts; non-executable files are skipped.
+        alpha = self.add_script("alpha", "alpha-tool")
+        zeta = self.add_script("zeta", "zeta-tool")
+        self.add_script("zeta", "README.md", executable=False)
+        for targets in (("claude",), ()):
+            with self.subTest(targets=targets):
+                self.install(*targets)
+                bin_dir = self.homes["AGENTS_HOME"] / "bin"
+                self.assert_link(bin_dir / "alpha-tool", alpha)
+                self.assert_link(bin_dir / "zeta-tool", zeta)
+                self.assertFalse((bin_dir / "README.md").exists())
+
+    def test_user_managed_scripts_are_not_replaced(self):
+        self.add_script("alpha", "alpha-tool")
+        local = self.homes["AGENTS_HOME"] / "bin" / "alpha-tool"
+        local.parent.mkdir(parents=True)
+        local.write_bytes(b"local tool\n")
+        result = self.install("zed", success=False)
+        self.assertIn(str(local), result.stderr)
+        self.assertEqual(local.read_bytes(), b"local tool\n")
+
+    def test_duplicate_script_names_fail_before_installation(self):
+        self.add_script("alpha", "shared-tool")
+        self.add_script("zeta", "shared-tool")
+        result = self.assert_preflight_failure()
+        for text in ("shared-tool", "plugins/alpha", "plugins/zeta"):
+            self.assertIn(text, result.stderr)
+        self.assertFalse(self.agents.exists())
+
     def test_helper_checks_precede_mutations_and_applies_follow_links(self):
         # Instrument only the fixture helper, retaining the real merge implementation.
         helper = self.repo / "scripts" / "merge-settings.py"

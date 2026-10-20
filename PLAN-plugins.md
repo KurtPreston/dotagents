@@ -102,4 +102,8 @@ bash -n install.sh
 
 ## Obstacles
 
+- Phase 1: once `.gitignore` stopped covering `rules-local/` and
+  `skills-local/`, `git add -A` staged the private local files. Unstaged them
+  before committing and staged explicit paths from then on.
+
 ## Found bugs
