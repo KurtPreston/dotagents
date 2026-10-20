@@ -98,3 +98,24 @@ test("existing files are kept, and non-npm projects get no setup or checks", asy
   assert.doesNotMatch(workflow, /npm ci/);
   assert.deepEqual(await guessConfig(repo), { checks: [], heavyChecks: [], visual: false });
 });
+
+test("a token without the user scope gets advice instead of a crash", async () => {
+  const { repo, fetch } = project({});
+  const scoped = (async (input: string | URL | Request, init?: RequestInit) =>
+    new URL(String(input)).pathname.includes("/actions/secrets/")
+      ? new Response('{"message":"required=[write:user]"}', { status: 403 })
+      : fetch(input, init)) as typeof fetch;
+  process.env.GITEA_TOKEN = "t";
+  const log: string[] = [];
+  await add({
+    repo,
+    ref: "main",
+    runsOn: "ubuntu-latest",
+    reviewer: "reviewer-bot",
+    implementer: "reviewer-bot",
+    secrets: { COPILOT_GITHUB_TOKEN: "c" },
+    log: (message) => log.push(message),
+    fetch: scoped,
+  });
+  assert.match(log.at(-1) ?? "", /needs the write:user scope/);
+});

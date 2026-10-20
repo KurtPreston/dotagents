@@ -82,9 +82,22 @@ export async function add(options: AddOptions): Promise<void> {
 
   // Secrets live on the user's account, so every repository of theirs can read them
   for (const [name, value] of Object.entries(options.secrets)) {
-    if (value) {
+    if (!value) {
+      continue;
+    }
+    try {
       await gitea.setUserSecret(name, value);
       log(`stored ${name} on your account`);
+    } catch (error) {
+      // A token without the user scope can do everything else, so explain rather than crash
+      if (!/required=\[write:user\]/.test(String(error))) {
+        throw error;
+      }
+      log(
+        "your token can't store account secrets (it needs the write:user scope): " +
+          "rerun with GITEA_TOKEN set to a token that has it, or add the secrets in Settings → Actions → Secrets",
+      );
+      return;
     }
   }
 }
