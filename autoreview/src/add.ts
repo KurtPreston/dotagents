@@ -1,0 +1,190 @@
+#!/usr/bin/env -S node --use-system-ca
+// Enable autoreview on a Gitea repository: write its workflow and config, create its
+// labels, add the bot accounts as collaborators, and optionally store the user-level secrets.
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { stdin, stdout } from "node:process";
+import { createInterface } from "node:readline/promises";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+import { CONFIG_FILE, DEFAULTS } from "./config.ts";
+import { Gitea } from "./gitea.ts";
+import { findToken, parseRemote } from "./remote.ts";
+
+const TEMPLATES = new URL("../templates/", import.meta.url);
+const WORKFLOW = ".gitea/workflows/autoreview.yml";
+export const SECRETS = [
+  "COPILOT_GITHUB_TOKEN",
+  "AUTOREVIEW_REVIEWER_TOKEN",
+  "AUTOREVIEW_IMPLEMENTER_TOKEN",
+] as const;
+
+/** What to enable, and where. */
+export interface AddOptions {
+  repo: string;
+  /** The dotagents ref the workflow pins. */
+  ref: string;
+  runsOn: string;
+  reviewer: string;
+  implementer: string;
+  /** Secret values to store on the user's account, by name. */
+  secrets: Partial<Record<(typeof SECRETS)[number], string>>;
+  log: (message: string) => void;
+  /** Injected for tests. */
+  fetch?: typeof fetch;
+}
+
+/** Enable autoreview on a repository. Files that already exist are left alone. */
+export async function add(options: AddOptions): Promise<void> {
+  const { repo, log } = options;
+  const origin = execFileSync("git", ["-C", repo, "remote", "get-url", "origin"], {
+    encoding: "utf8",
+  }).trim();
+  const remote = parseRemote(origin);
+  const token = await findToken(remote.url);
+  if (!token) {
+    throw new Error(`no token for ${remote.url}: set GITEA_TOKEN or log in with tea`);
+  }
+  const gitea = new Gitea({ ...remote, token, fetch: options.fetch });
+
+  // The workflow, with the project's setup when it uses npm
+  const npm = existsSync(join(repo, "package-lock.json"));
+  const setup = npm ? await template("npm-setup.yml") : "";
+  await writeNew(
+    join(repo, WORKFLOW),
+    fill(await template("gitea.yml"), { runsOn: options.runsOn, ref: options.ref, setup }),
+    log,
+  );
+
+  // The config, with checks guessed from the project's scripts
+  await writeNew(
+    join(repo, CONFIG_FILE),
+    `${JSON.stringify(await guessConfig(repo), null, 2)}\n`,
+    log,
+  );
+
+  // Labels, and the bots as collaborators (Gitea adds them without an invitation)
+  for (const label of [DEFAULTS.label, DEFAULTS.deferLabel]) {
+    await gitea.ensureLabel(label);
+  }
+  log(`labels ${DEFAULTS.label} and ${DEFAULTS.deferLabel} are ready`);
+  for (const bot of [options.reviewer, options.implementer]) {
+    if (await gitea.userExists(bot)) {
+      await gitea.addCollaborator(bot);
+      log(`${bot} can write to ${remote.owner}/${remote.repo}`);
+    } else {
+      log(
+        `${bot} doesn't exist yet: create it, then run this again (both roles post as one identity until then)`,
+      );
+    }
+  }
+
+  // Secrets live on the user's account, so every repository of theirs can read them
+  for (const [name, value] of Object.entries(options.secrets)) {
+    if (value) {
+      await gitea.setUserSecret(name, value);
+      log(`stored ${name} on your account`);
+    }
+  }
+}
+
+/** Checks from the project's npm scripts: quick ones always, tests only on a capable runner. */
+export async function guessConfig(repo: string): Promise<object> {
+  let scripts: Record<string, string> = {};
+  try {
+    scripts = JSON.parse(await readFile(join(repo, "package.json"), "utf8")).scripts ?? {};
+  } catch {
+    // Not an npm project; leave checks for the user to fill in
+  }
+  const run = (names: string[]) =>
+    names.filter((name) => name in scripts).map((name) => `npm run ${name}`);
+  return {
+    checks: run(["typecheck", "lint", "format:check", "build"]),
+    heavyChecks: run(["test"]),
+    visual: false,
+  };
+}
+
+async function template(name: string): Promise<string> {
+  return readFile(new URL(name, TEMPLATES), "utf8");
+}
+
+/** Fill `{{name}}` slots. */
+function fill(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (match, key: string) => vars[key] ?? match);
+}
+
+/** Write a file unless it exists, saying which. */
+async function writeNew(path: string, text: string, log: (message: string) => void): Promise<void> {
+  if (existsSync(path)) {
+    log(`kept the existing ${path}`);
+    return;
+  }
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, text);
+  log(`wrote ${path}`);
+}
+
+/** Ask for each secret without echoing it, or take it from the environment. */
+async function askSecrets(): Promise<AddOptions["secrets"]> {
+  const secrets: AddOptions["secrets"] = {};
+  const prompt = createInterface({ input: stdin, output: stdout, terminal: true });
+  const muted = prompt as unknown as { _writeToOutput: (text: string) => void };
+  try {
+    for (const name of SECRETS) {
+      if (process.env[name]) {
+        secrets[name] = process.env[name];
+        continue;
+      }
+
+      // Hide what's typed after the question
+      stdout.write(`${name} (empty to skip): `);
+      muted._writeToOutput = () => {};
+      secrets[name] = (await prompt.question("")).trim();
+      muted._writeToOutput = (text) => stdout.write(text);
+      stdout.write("\n");
+    }
+  } finally {
+    prompt.close();
+  }
+  return secrets;
+}
+
+async function main(): Promise<void> {
+  const { positionals, values } = parseArgs({
+    allowPositionals: true,
+    options: {
+      secrets: { type: "boolean", default: false },
+      ref: { type: "string", default: "main" },
+      "runs-on": { type: "string", default: "ubuntu-latest" },
+      reviewer: { type: "string", default: "autoreview-reviewer" },
+      implementer: { type: "string", default: "autoreview-implementer" },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  });
+  if (values.help || positionals.length > 1) {
+    console.log(`usage: add.sh [<repo>] [--secrets] [--ref <dotagents ref>] [--runs-on <label>]
+                  [--reviewer <bot>] [--implementer <bot>]
+
+Enables autoreview on a Gitea repository (default: the current directory).
+--secrets stores ${SECRETS.join(", ")} on your account,
+taking each from the environment or asking for it.`);
+    return;
+  }
+  await add({
+    repo: resolve(positionals[0] ?? "."),
+    ref: values.ref,
+    runsOn: values["runs-on"],
+    reviewer: values.reviewer,
+    implementer: values.implementer,
+    secrets: values.secrets ? await askSecrets() : {},
+    log: (message) => console.log(`autoreview: ${message}`),
+  });
+}
+
+// Run when called as a script, not when imported by tests
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await main();
+}

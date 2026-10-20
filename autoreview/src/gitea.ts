@@ -183,6 +183,29 @@ export class Gitea implements Forge {
     );
   }
 
+  /** Create a repository label unless it exists. Used when enabling a repository. */
+  async ensureLabel(name: string): Promise<void> {
+    await this.#labelId(name);
+  }
+
+  /** Whether a user exists on the server. */
+  async userExists(login: string): Promise<boolean> {
+    const response = await this.#fetch(`${this.options.url}/api/v1/users/${login}`, {
+      headers: { Authorization: `token ${this.options.token}` },
+    });
+    return response.ok;
+  }
+
+  /** Give a user write access to the repository, without an invitation to accept. */
+  async addCollaborator(login: string): Promise<void> {
+    await this.#request("PUT", `${this.#repo}/collaborators/${login}`, { permission: "write" });
+  }
+
+  /** Store an Actions secret on the token's own account, readable by all its repositories. */
+  async setUserSecret(name: string, value: string): Promise<void> {
+    await this.#request("PUT", `/user/actions/secrets/${name}`, { data: value });
+  }
+
   get #repo(): string {
     return `/repos/${this.options.owner}/${this.options.repo}`;
   }
