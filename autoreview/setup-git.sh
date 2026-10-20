@@ -8,8 +8,14 @@ cd "$GITHUB_WORKSPACE"
 server="${GITHUB_SERVER_URL%/}"
 
 # Ask the server who the token belongs to; the built-in Actions token has no user
-login="$(curl -fsS -H "Authorization: token $PUSH_TOKEN" "$server/api/v1/user" 2>/dev/null |
-  python3 -c 'import json,sys; print(json.load(sys.stdin)["login"])' 2>/dev/null || echo autoreview)"
+response="$(curl -sS -w '\n%{http_code}' -H "Authorization: token $PUSH_TOKEN" "$server/api/v1/user" 2>&1 || true)"
+status="${response##*$'\n'}"
+login="$(printf '%s' "${response%$'\n'*}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["login"])' 2>/dev/null || true)"
+if [[ "$status" != 200 || -z "$login" ]]; then
+  echo "autoreview: couldn't look up the token's user at $server/api/v1/user (HTTP $status: ${response%$'\n'*})" >&2
+  echo "autoreview: a bot token needs the read:user scope; committing as autoreview" >&2
+  login=autoreview
+fi
 host="${server#*://}"
 
 # actions/checkout authenticates with a header, which would override the URL's token
