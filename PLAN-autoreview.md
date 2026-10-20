@@ -223,4 +223,17 @@ Before phase 6's end-to-end trial:
 
 ## Obstacles
 
+- Node's `fetch` rejected the Gitea server's certificate (private CA,
+  trusted by the system keychain): the CLI runs with `--use-system-ca`
+  (shebang), and the action must do the same or set `NODE_EXTRA_CA_CERTS`.
+- No forest-game PR has review threads yet, so thread grouping is tested
+  against Gitea's documented shapes only; the phase 6 trial checks it live.
+- Copilot CLI isn't logged in on the development machine (`Authentication
+  failed`, also outside the sandbox), so real agent calls wait for the user
+  to run `copilot` then `/login`, or for the runner's token. Agent output is
+  read from `-s` (final answer only) rather than the JSONL event stream,
+  whose format isn't documented.
+- `add.sh` becomes a thin wrapper around `src/add.ts`, tested with
+  `node --test` rather than Python, since the tool is TypeScript.
+
 ## Found bugs
