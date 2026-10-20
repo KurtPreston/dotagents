@@ -167,12 +167,12 @@ export function askHidden(question: string): Promise<string> {
       stdout.write("\n");
     };
 
-    // Enter ends the line, Ctrl-C cancels, backspace deletes
+    // Enter ends the line, Ctrl-C cancels, backspace deletes; bracketed-paste markers are dropped
     const onData = (chunk: string) => {
       for (const char of chunk) {
         if (char === "\r" || char === "\n") {
           finish();
-          resolve(value);
+          resolve(value.replace(/\[20[01]~/g, ""));
           return;
         }
         if (char === "\u0003") {
