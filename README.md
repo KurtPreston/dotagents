@@ -12,6 +12,7 @@ Personal instructions, skills, and selected app settings for Cursor, Zed, Claude
 - `settings/copilot.json` — selected GitHub Copilot settings enforced on install.
 - `scripts/merge-settings.py` — strict JSON overlay helper with safe writes and backups.
 - `tests/` — helper and installer tests using temporary configuration directories.
+- `autoreview/` — a Gitea Actions workflow in which two Copilot CLI agents deliberate a pull request; see [its README](autoreview/README.md).
 - `install.sh` — generates `AGENTS.md`, then installs compatibility links, adapters, and selected settings in each agent's global configuration.
 
 Edit a rule, a skill, or a settings overlay in this repository, then commit the change normally. Put rules that only apply to one machine, such as which GitHub account to use, in `rules-local/` instead; they never leave the machine. Installed links and adapters are installation details; app settings files also retain locally managed values.
@@ -116,6 +117,7 @@ Install while the app is not writing settings. The helper detects changes betwee
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 bash -n install.sh
+(cd autoreview && npm ci && npm run typecheck && npm run lint && npm run format:check && npm test)
 ```
 
 Tests use temporary homes and configuration-directory overrides, never real application settings.
