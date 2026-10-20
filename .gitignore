@@ -7,3 +7,5 @@
 # Machine-specific rules stay on this machine
 /rules-local/*
 !/rules-local/.gitkeep
+/skills-local/*
+!/skills-local/.gitkeep
