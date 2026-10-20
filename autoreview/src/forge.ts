@@ -8,7 +8,10 @@ export interface PullRequest {
   draft: boolean;
   state: "open" | "closed";
   labels: string[];
+  /** The head's name, for display and commit prefixes. */
   headRef: string;
+  /** The branch to push fixes to; undefined when the head isn't a branch of this repository (deleted, or from a fork). */
+  headBranch: string | undefined;
   headSha: string;
   baseRef: string;
   baseSha: string;

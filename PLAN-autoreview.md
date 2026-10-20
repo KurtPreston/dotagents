@@ -228,11 +228,16 @@ Before phase 6's end-to-end trial:
   (shebang), and the action must do the same or set `NODE_EXTRA_CA_CERTS`.
 - No forest-game PR has review threads yet, so thread grouping is tested
   against Gitea's documented shapes only; the phase 6 trial checks it live.
-- Copilot CLI isn't logged in on the development machine (`Authentication
-  failed`, also outside the sandbox), so real agent calls wait for the user
-  to run `copilot` then `/login`, or for the runner's token. Agent output is
-  read from `-s` (final answer only) rather than the JSONL event stream,
-  whose format isn't documented.
+- Copilot CLI first failed to authenticate on the development machine; it
+  worked later (signed in meanwhile). Agent output is read from `-s` (final
+  answer only) rather than the JSONL event stream, whose format isn't
+  documented.
+- Gitea reports a deleted head branch as `refs/pull/N/head`: checkouts fetch
+  through the pull ref, and pushes go to `headBranch`, which is undefined
+  for deleted or forked heads (such pull requests are skipped).
+- The review summary is posted as a conversation comment rather than the
+  review's body, since Gitea's comment list omits review bodies and the
+  summary's marker must be readable to resume.
 - `add.sh` becomes a thin wrapper around `src/add.ts`, tested with
   `node --test` rather than Python, since the tool is TypeScript.
 

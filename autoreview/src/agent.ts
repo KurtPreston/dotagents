@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Config, RoleConfig } from "./config.ts";
@@ -129,7 +129,9 @@ export async function runAgent<T>(call: AgentCall<T>, usage: Usage): Promise<T> 
     const output = await run(bin, copilotArgs(call, taskFile, runDir), call);
     await writeFile(join(runDir, `answer-${attempt}.txt`), output);
     try {
-      return call.validate(extractJson(output));
+      const value = call.validate(extractJson(output));
+      await rm(runDir, { recursive: true, force: true });
+      return value;
     } catch (error) {
       if (!(error instanceof SchemaError) || attempt === 2) {
         throw new AgentError(

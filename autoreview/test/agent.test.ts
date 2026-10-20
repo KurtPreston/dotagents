@@ -1,3 +1,4 @@
+import "./scratch.ts";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -18,7 +19,7 @@ const FAKE = new URL("./fake-copilot.ts", import.meta.url).pathname;
 /** Point the runner at the fake CLI, playing back these steps. */
 async function fake(
   steps: object[],
-): Promise<{ log: () => Promise<{ args: string[]; cwd: string }[]> }> {
+): Promise<{ log: () => Promise<{ args: string[]; cwd: string; task: string }[]> }> {
   const dir = await mkdtemp(join(tmpdir(), "autoreview-fake-"));
   const script = join(dir, "steps.json");
   await writeFile(script, JSON.stringify(steps));
@@ -57,9 +58,9 @@ test("a valid answer comes back typed, and the call is counted", async () => {
   assert.deepEqual(usage, { "claude-opus-5.5": 1 });
 
   // The prompt points at a task file holding the instructions
-  const [{ args }] = await log();
-  const taskFile = /Your task is in (\S+)\./.exec(args[1])?.[1] ?? "";
-  assert.equal(await readFile(taskFile, "utf8"), "Do the thing.");
+  const [{ args, task }] = await log();
+  assert.match(args[1], /Your task is in \S+task-1\.md\./);
+  assert.equal(task, "Do the thing.");
   assert.deepEqual(args.slice(args.indexOf("--model"), args.indexOf("--model") + 4), [
     "--model",
     "claude-opus-5.5",
@@ -75,8 +76,7 @@ test("an invalid answer is retried once with the problem, then accepted", async 
   ]);
   assert.deepEqual(await runAgent(call(), {}), answer);
   const calls = await log();
-  const retryTask = /Your task is in (\S+)\./.exec(calls[1].args[1])?.[1] ?? "";
-  assert.match(await readFile(retryTask, "utf8"), /\$\.action must be one of fix, reply, defer/);
+  assert.match(calls[1].task, /\$\.action must be one of fix, reply, defer/);
 });
 
 test("two invalid answers, a failed run, or a timeout throw", async () => {

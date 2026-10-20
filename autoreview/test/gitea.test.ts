@@ -49,8 +49,8 @@ test("a pull request is read, with WIP titles counted as drafts", async () => {
       user: user("kurt"),
       state: "open",
       labels: [{ name: "autoreview" }],
-      head: { ref: "ferns", sha: "abc" },
-      base: { ref: "main", sha: "def" },
+      head: { ref: "ferns", sha: "abc", label: "ferns", repo_id: 1 },
+      base: { ref: "main", sha: "def", repo_id: 1 },
     },
   });
   const pr = await forge.pullRequest(7);
@@ -58,6 +58,27 @@ test("a pull request is read, with WIP titles counted as drafts", async () => {
   assert.equal(pr.body, "");
   assert.deepEqual(pr.labels, ["autoreview"]);
   assert.equal(pr.headSha, "abc");
+  assert.equal(pr.headBranch, "ferns");
+});
+
+test("a deleted head branch, or one in a fork, can't take pushes", async () => {
+  const pull = (head: object) => ({
+    number: 7,
+    title: "Grow ferns",
+    body: "",
+    user: user("kurt"),
+    state: "open",
+    labels: [],
+    head: { sha: "abc", ...head },
+    base: { ref: "main", sha: "def", repo_id: 1 },
+  });
+  const { forge } = stub({
+    "GET /repos/o/r/pulls/7": pull({ ref: "refs/pull/7/head", label: "ferns", repo_id: 1 }),
+    "GET /repos/o/r/pulls/8": pull({ ref: "ferns", label: "someone:ferns", repo_id: 2 }),
+  });
+  const deleted = await forge.pullRequest(7);
+  assert.deepEqual([deleted.headRef, deleted.headBranch], ["ferns", undefined]);
+  assert.equal((await forge.pullRequest(8)).headBranch, undefined);
 });
 
 test("review comments group into threads by path and line, oldest first", async () => {

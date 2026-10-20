@@ -24,8 +24,8 @@ interface RawPull {
   draft?: boolean;
   state: "open" | "closed";
   labels: { name: string }[] | null;
-  head: { ref: string; sha: string };
-  base: { ref: string; sha: string };
+  head: { ref: string; sha: string; label: string; repo_id: number };
+  base: { ref: string; sha: string; repo_id: number };
 }
 interface RawReview {
   id: number;
@@ -72,6 +72,8 @@ export class Gitea implements Forge {
     const raw = await this.#json<RawPull>("GET", `${this.#repo}/pulls/${number}`);
 
     // Gitea also treats a "WIP:" title prefix as a draft
+    // A deleted head branch is reported by its pull ref
+    const deleted = raw.head.ref.startsWith("refs/");
     const draft = raw.draft === true || /^\s*(\[wip\]|wip:)/i.test(raw.title);
     return {
       number: raw.number,
@@ -81,7 +83,8 @@ export class Gitea implements Forge {
       draft,
       state: raw.state,
       labels: (raw.labels ?? []).map((label) => label.name),
-      headRef: raw.head.ref,
+      headRef: deleted ? raw.head.label.replace(/^.*:/, "") : raw.head.ref,
+      headBranch: deleted || raw.head.repo_id !== raw.base.repo_id ? undefined : raw.head.ref,
       headSha: raw.head.sha,
       baseRef: raw.base.ref,
       baseSha: raw.base.sha,

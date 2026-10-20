@@ -63,6 +63,7 @@ test("prompts fill every slot, and leave braces in filled text alone", () => {
     state: "open",
     labels: [],
     headRef: "ferns",
+    headBranch: "ferns",
     headSha: "abc",
     baseRef: "main",
     baseSha: "def",

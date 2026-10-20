@@ -18,8 +18,14 @@ const index = existsSync(counter) ? Number(readFileSync(counter, "utf8")) : 0;
 writeFileSync(counter, String(index + 1));
 appendFileSync(
   `${script}.log`,
-  `${JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd() })}\n`,
+  `${JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), task: taskText() })}\n`,
 );
+
+/** The task file the prompt points at, read before the runner deletes it. */
+function taskText(): string {
+  const path = /Your task is in (\S+)\./.exec(process.argv[3] ?? "")?.[1];
+  return path ? readFileSync(path, "utf8") : "";
+}
 
 // Answer, after an optional pause
 const step = steps[Math.min(index, steps.length - 1)];
