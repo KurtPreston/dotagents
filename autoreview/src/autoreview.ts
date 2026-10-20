@@ -61,6 +61,13 @@ async function main(): Promise<void> {
     return;
   }
 
+  // A run started by the implementer's own push has nothing to do
+  const sender = process.env.AUTOREVIEW_SENDER;
+  if (sender && sender === (await implementer.login().catch(() => undefined))) {
+    console.error(`autoreview: skipped, since ${sender}'s own push started this run`);
+    return;
+  }
+
   // A dry run plays the deliberation against a copy of the pull request in memory
   const dryRun = values["dry-run"];
   let roles = { reviewer, implementer };
