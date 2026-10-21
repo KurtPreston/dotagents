@@ -45,10 +45,10 @@ Out:
 | --- | --- | --- | --- |
 | `zed` | `$ZED_HOME/settings.json` | `context_servers` | `{command, args, env}` |
 | `copilot` | `$COPILOT_HOME/mcp-config.json` | `mcpServers` | `{type: "stdio", command, args, tools: ["*"]}`, plus `env` when not empty |
-| `claude` | `~/.claude.json` (`CLAUDE_CONFIG_FILE`) | `mcpServers` | `{type: "stdio", command, args, env}` |
+| `claude` | `~/.claude.json` | `mcpServers` | `{type: "stdio", command, args, env}` |
 | `cursor` | `$CURSOR_HOME/mcp.json` | `mcpServers` | `{command, args, env}` |
 
-Claude Code keeps user-scope MCP servers in `~/.claude.json`, not in `$CLAUDE_HOME`, so it gets its own override for tests. Confirm each shape against the tool's current docs while implementing, and record any differences under Obstacles.
+Claude Code keeps user-scope MCP servers in `~/.claude.json`, not in `$CLAUDE_HOME`. Tests already point `HOME` at a temporary directory, so that path needs no separate override. Confirm each shape against the tool's current docs while implementing, and record any differences under Obstacles.
 
 ### Ownership, adoption, and pruning
 
