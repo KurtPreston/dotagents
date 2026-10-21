@@ -131,4 +131,8 @@ Until phase 3 removes them, also run `PYTHONDONTWRITEBYTECODE=1 python3 -m unitt
 
 ## Obstacles
 
+- npm here goes through Microsoft's package proxy, which lags the public registry. It has no `oxfmt@0.74.0` or `oxlint@1.89.0`, the versions `autoreview` pinned, so the root package uses `oxfmt@0.73.0` and `oxlint@1.88.0`. TypeScript 5.9.3 and `@types/node` 22.20.4 are unchanged.
+- The proxy also wrote internal Azure DevOps feed URLs into `package-lock.json`, which public runners can't reach. They were rewritten to `registry.npmjs.org`, and `npm ci` still works here through `replace-registry-host`. The convention is recorded in `docs/best-practices.md`.
+- The `max-params: 3` lint rule required options objects in `sync.ts`: `setServer(text, [key, name], value)`, `planTarget({...})`, and `writePlanned({file, current, text}, options)`. The test helper `declare` takes `"plugin/name"`.
+
 ## Found bugs

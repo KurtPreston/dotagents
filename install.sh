@@ -122,7 +122,7 @@ run_mcp_sync() {
   # Pass the same homes the installer uses, plus every plugin and selected target
   HOME="$HOME" ZED_HOME="$ZED_HOME" COPILOT_HOME="$COPILOT_HOME" \
     CURSOR_HOME="$CURSOR_HOME" AGENTS_HOME="$AGENTS_HOME" \
-    node "$MCP_DIR/sync-mcp.mjs" "$@" --plugins "${PLUGINS[@]}" --targets "${TARGETS[@]}"
+    node "$MCP_DIR/sync-mcp.ts" "$@" --plugins "${PLUGINS[@]}" --targets "${TARGETS[@]}"
 }
 
 # MCP sync needs Node and its one dependency before anything is installed
@@ -135,13 +135,13 @@ if [[ "$RUN_MCP" == true ]]; then
   fi
 
   # Install jsonc-parser into the repository when missing or older than the lockfile
-  if [[ ! -e "$MCP_DIR/node_modules/.package-lock.json" \
-      || "$MCP_DIR/package-lock.json" -nt "$MCP_DIR/node_modules/.package-lock.json" ]]; then
+  if [[ ! -e "$REPO_ROOT/node_modules/.package-lock.json" \
+      || "$REPO_ROOT/package-lock.json" -nt "$REPO_ROOT/node_modules/.package-lock.json" ]]; then
     if ! command -v npm >/dev/null 2>&1; then
       echo "error: MCP sync needs npm to install its dependencies; install npm and rerun ./install.sh" >&2
       exit 1
     fi
-    (cd "$MCP_DIR" && npm ci --no-audit --no-fund --silent)
+    (cd "$REPO_ROOT" && npm ci --no-audit --no-fund --silent)
   fi
 
   # Resolve commands and detect conflicts in every selected config before any changes

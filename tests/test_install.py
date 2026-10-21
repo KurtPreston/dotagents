@@ -520,19 +520,20 @@ NODE = shutil.which("node")
 MCP_SOURCES = REPO_ROOT / "scripts" / "mcp"
 
 
-@unittest.skipUnless(BASH and NODE and (MCP_SOURCES / "node_modules").is_dir(),
-                     "MCP installer tests require bash, node, and npm ci in scripts/mcp")
+@unittest.skipUnless(BASH and NODE and (REPO_ROOT / "node_modules").is_dir(),
+                     "MCP installer tests require bash, node, and npm ci")
 class McpInstallTests(InstallTests):
     # Reuse InstallTests' fixture, but only run the MCP tests defined here.
     def setUp(self):
         super().setUp()
-        # Copy the sync script and reuse this checkout's installed dependency.
+        # Copy the sync script and reuse this checkout's installed dependencies.
         destination = self.repo / "scripts" / "mcp"
         destination.mkdir(parents=True)
-        for source in MCP_SOURCES.iterdir():
-            if source.suffix in (".mjs", ".json"):
-                shutil.copy2(source, destination / source.name)
-        (destination / "node_modules").symlink_to(MCP_SOURCES / "node_modules")
+        for source in MCP_SOURCES.glob("*.ts"):
+            shutil.copy2(source, destination / source.name)
+        for name in ("package.json", "package-lock.json"):
+            shutil.copy2(REPO_ROOT / name, self.repo / name)
+        (self.repo / "node_modules").symlink_to(REPO_ROOT / "node_modules")
 
         # Node is on the allowlisted PATH, along with a command for servers to resolve.
         (self.bin / "node").symlink_to(NODE)
@@ -628,7 +629,7 @@ class McpInstallTests(InstallTests):
 
     def test_missing_dependencies_without_npm_fail_before_installation(self):
         self.add_mcp("alpha", "tool", {"command": "tool"})
-        (self.repo / "scripts" / "mcp" / "node_modules").unlink()
+        (self.repo / "node_modules").unlink()
         result = self.assert_preflight_failure()
         self.assertIn("npm", result.stderr)
 

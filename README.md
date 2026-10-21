@@ -59,12 +59,12 @@ Install only selected agents:
 
 The installer configures:
 
-| Agent | Standing instructions | Skills | MCP servers |
-| --- | --- | --- | --- |
-| Cursor | Generated at `~/.cursor/rules/dotagents.mdc` | Linked individually into `~/.agents/skills/` | `~/.cursor/mcp.json` |
-| Zed | `~/.config/zed/AGENTS.md` symlink | Linked individually into `~/.agents/skills/` | `context_servers` in `~/.config/zed/settings.json` |
-| Claude Code | `~/.claude/CLAUDE.md` symlink | Linked individually into `~/.claude/skills/` | `~/.claude.json` |
-| GitHub Copilot | `~/.copilot/copilot-instructions.md` symlink | Linked individually into `~/.agents/skills/` | `~/.copilot/mcp-config.json` |
+| Agent          | Standing instructions                        | Skills                                       | MCP servers                                        |
+| -------------- | -------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
+| Cursor         | Generated at `~/.cursor/rules/dotagents.mdc` | Linked individually into `~/.agents/skills/` | `~/.cursor/mcp.json`                               |
+| Zed            | `~/.config/zed/AGENTS.md` symlink            | Linked individually into `~/.agents/skills/` | `context_servers` in `~/.config/zed/settings.json` |
+| Claude Code    | `~/.claude/CLAUDE.md` symlink                | Linked individually into `~/.claude/skills/` | `~/.claude.json`                                   |
+| GitHub Copilot | `~/.copilot/copilot-instructions.md` symlink | Linked individually into `~/.agents/skills/` | `~/.copilot/mcp-config.json`                       |
 
 Every run first regenerates `AGENTS.md`, starting it with a marker comment. The installer refuses to replace an `AGENTS.md` without that marker, so move hand-written instructions into a plugin's `rules/` before installing. Cursor requires `.mdc` frontmatter, so its adapter is also regenerated from `AGENTS.md`. Zed, Claude Code, and Copilot use the generated file directly through symlinks. The Copilot integration covers Copilot CLI and the Copilot agent in VS Code, which share `~/.copilot`.
 
