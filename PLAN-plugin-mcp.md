@@ -149,4 +149,8 @@ All tests use temporary homes and override variables, never real app config.
 
 ## Obstacles
 
+- `jsonc-parser`'s `getNodeValue` returns objects with no prototype, which broke `deepStrictEqual` comparisons. `parseDocument` now round-trips values through `JSON` to get plain objects.
+- `jsonc-parser`'s `modify` with formatting reflows the previous sibling's lines when inserting a property, which would reformat hand-added Zed servers. Without formatting, it puts the new property on the sibling's line. Its removal also deletes a line comment after the previous property. `setServer` now writes insertions and removals itself, one whole line at a time, matching the sibling's indentation and comma style. It falls back to `modify` for replacements, empty objects, and layouts it can't edit line by line.
+- The state file is saved after each target is written, not once at the end. Otherwise, a failure on a later target would leave servers in earlier configs with no record that dotagents owns them.
+
 ## Found bugs
