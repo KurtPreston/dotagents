@@ -54,6 +54,3 @@ await context.close();
 - Agents running GPU timings at the same time share the GPU. Run one timing
   pass at a time and say so when results may be contended.
 - `file://` URLs and the internet are unreachable from this browser by design.
-- In an agentbox session, the project must approve `allowLocalServers` for the
-  dev server to accept the browser's connection. Agents without unrestricted
-  network also need `127.0.0.1:9222` in `networkAllowlist`.
