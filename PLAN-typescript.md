@@ -133,6 +133,10 @@ Until phase 3 removes them, also run `PYTHONDONTWRITEBYTECODE=1 python3 -m unitt
 
 - npm here goes through Microsoft's package proxy, which lags the public registry. It has no `oxfmt@0.74.0` or `oxlint@1.89.0`, the versions `autoreview` pinned, so the root package uses `oxfmt@0.73.0` and `oxlint@1.88.0`. TypeScript 5.9.3 and `@types/node` 22.20.4 are unchanged.
 - The proxy also wrote internal Azure DevOps feed URLs into `package-lock.json`, which public runners can't reach. They were rewritten to `registry.npmjs.org`, and `npm ci` still works here through `replace-registry-host`. The convention is recorded in `docs/best-practices.md`.
-- The `max-params: 3` lint rule required options objects in `sync.ts`: `setServer(text, [key, name], value)`, `planTarget({...})`, and `writePlanned({file, current, text}, options)`. The test helper `declare` takes `"plugin/name"`.
+- The settings helper's instrumentation test, which wrapped `merge-settings.py` and later `apply-settings.ts` to log call order, was dropped along with the temporary CLI. Validation now runs in-process before any change, and preflight tests cover it by asserting the agent homes are untouched after each kind of failure.
+- Node is now required for every install, so the tests that ran Cursor-only and Zed-only installs without Node now check that those installs don't need valid overlays. New wrapper tests cover a missing Node (for every target combination), an older Node, and stale dependencies with no npm.
+- The `max-params: 3` lint rule required options objects: `setServer(text, [key, name], value)`, `planTarget({...})`, and `replaceFile({file, current, text}, options)`. The test helpers take `"plugin/name"`.
 
 ## Found bugs
+
+- **Part of the effort, fixed:** the Bash installer checked for hand-managed files that a link would replace (instruction files, skill folders, plugin scripts, and Cursor's adapter) only during installation. By then, `AGENTS.md`, earlier agents' links, and settings could already have been changed. `scripts/install.ts` checks all of them before changing anything, and the installer tests now assert that nothing in the agent homes changes and `AGENTS.md` isn't generated.

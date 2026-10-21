@@ -2,23 +2,14 @@
 import { test } from "node:test";
 import type { TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { setServer, sync } from "../scripts/mcp/sync.ts";
 import type { SyncOptions } from "../scripts/mcp/sync.ts";
 import type { Server } from "../scripts/mcp/targets.ts";
 import { targetEnv } from "../scripts/mcp/targets.ts";
 
-const SCRIPT = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "scripts",
-  "mcp",
-  "sync-mcp.ts",
-);
 const ZED_SETTINGS = `// Zed settings
 {
   "theme": "One Dark", // keep this comment
@@ -290,29 +281,4 @@ test("rejects symlinks, malformed files, bad server maps, and unknown targets", 
   write(path.join(env.COPILOT_HOME, "mcp-config.json"), '{"mcpServers": []}');
   assert.throws(() => run([server("a")], ["copilot"]), /"mcpServers" must be an object/);
   assert.throws(() => run([server("a")], ["vscode"]), /unknown MCP target 'vscode'/);
-});
-
-test("CLI resolves commands and reports errors without a stack trace", (t) => {
-  const { root, env } = fixture(t);
-  const plugin = path.join(root, "plugins", "p");
-  write(path.join(plugin, "mcp", "tool.json"), JSON.stringify({ command: "tool", args: [] }));
-  write(path.join(root, "bin", "tool"), "#!/bin/sh\n", 0o755);
-  const childEnv = { HOME: env.HOME, PATH: path.join(root, "bin") };
-  const args = [SCRIPT, "--plugins", plugin, "--targets", "cursor"];
-
-  execFileSync(process.execPath, args, { env: childEnv });
-  assert.equal(
-    read(path.join(env.CURSOR_HOME, "mcp.json")).mcpServers.tool.command,
-    path.join(root, "bin", "tool"),
-  );
-
-  const failed = spawnSync(process.execPath, args, {
-    env: { HOME: env.HOME, PATH: "" },
-    encoding: "utf8",
-  });
-  assert.equal(failed.status, 1);
-  assert.match(
-    failed.stderr,
-    /^error: plugins\/p\/mcp\/tool.json: command "tool" was not found on PATH/,
-  );
 });

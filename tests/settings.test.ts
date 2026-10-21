@@ -2,19 +2,10 @@
 import { test } from "node:test";
 import type { TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { applySettings } from "../scripts/settings.ts";
-
-const CLI = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "scripts",
-  "apply-settings.ts",
-);
 
 // Temporary overlay and destination, with helpers to apply and inspect them
 function fixture(t: TestContext) {
@@ -309,25 +300,21 @@ test("booleans and numbers are never treated as equal", (t) => {
   }
 });
 
-test("the CLI's --check validates without writing anything", async (t) => {
+test("check mode validates without writing anything", async (t) => {
   for (const exists of [false, true]) {
     await t.test(`exists: ${exists}`, (t) => {
       const f = fixture(t);
-      const target = exists ? f.target : path.join(f.root, "absent", "settings.json");
+      f.state.target = exists ? f.target : path.join(f.root, "absent", "settings.json");
       if (exists) {
-        fs.writeFileSync(target, '{"local": true}');
+        fs.writeFileSync(f.state.target, '{"local": true}');
       }
-      const before = exists ? fs.statSync(target, { bigint: true }) : null;
-      const result = spawnSync(process.execPath, [CLI, "--check", f.overlay, target], {
-        encoding: "utf8",
-      });
-      assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, new RegExp(`validated ${target}`));
+      const before = exists ? fs.statSync(f.state.target, { bigint: true }) : null;
+      assert.match(f.apply({ check: true }), new RegExp(`validated ${f.state.target}`));
       if (before) {
-        assert.equal(fs.readFileSync(target, "utf8"), '{"local": true}');
-        assert.equal(fs.statSync(target, { bigint: true }).ctimeNs, before.ctimeNs);
+        assert.equal(fs.readFileSync(f.state.target, "utf8"), '{"local": true}');
+        assert.equal(fs.statSync(f.state.target, { bigint: true }).ctimeNs, before.ctimeNs);
       } else {
-        assert.ok(!fs.existsSync(path.dirname(target)));
+        assert.ok(!fs.existsSync(path.dirname(f.state.target)));
       }
       assert.deepEqual(f.backups(), []);
       assert.deepEqual(f.temporaries(), []);
@@ -335,15 +322,13 @@ test("the CLI's --check validates without writing anything", async (t) => {
   }
 });
 
-test("the CLI reports invalid input without exposing values", (t) => {
+test("errors name the file without exposing its values", (t) => {
   const f = fixture(t);
   fs.writeFileSync(f.target, '{"secret": "do-not-log",}');
-  const result = spawnSync(process.execPath, [CLI, "--check", f.overlay, f.target], {
-    encoding: "utf8",
-  });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, new RegExp(`^error: ${f.target}`));
-  assert.doesNotMatch(result.stderr, /do-not-log/);
+  assert.throws(
+    () => f.apply({ check: true }),
+    (error: Error) => error.message.startsWith(f.target) && !error.message.includes("do-not-log"),
+  );
   assert.deepEqual(f.backups(), []);
 });
 

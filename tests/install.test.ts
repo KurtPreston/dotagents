@@ -281,11 +281,10 @@ test("installer", { skip }, async (t) => {
 
   await t.test("runner install uses RUNNER_TEMP and exports homes", (t) => {
     const f = fixture(t);
-    fs.symlinkSync(BASH ?? "", path.join(f.bin, "bash"));
     const runnerTemp = path.join(f.root, "runner temp");
     const githubEnv = path.join(f.root, "github env");
     const env = Object.fromEntries(Object.entries(f.env).filter(([key]) => !key.endsWith("_HOME")));
-    const result = spawnSync(BASH ?? "bash", [path.join(f.repo, "scripts", "install-runner.sh")], {
+    const result = spawnSync(BASH ?? "bash", [path.join(f.repo, "install.sh"), "--runner"], {
       cwd: f.root,
       env: { ...env, RUNNER_TEMP: runnerTemp, GITHUB_ENV: githubEnv },
       encoding: "utf8",
@@ -325,18 +324,16 @@ test("installer", { skip }, async (t) => {
     assert.equal(backupsOf(f.copilotSettings).length, 1);
   });
 
-  await t.test("cursor only needs neither Node nor valid overlays", (t) => {
+  await t.test("cursor only needs no valid overlays", (t) => {
     const f = fixture(t);
-    fs.rmSync(path.join(f.bin, "node"));
     fs.writeFileSync(f.overlay, "not JSON");
     fs.writeFileSync(f.copilotOverlay, "not JSON");
     install(f, ["cursor"]);
     assertInstalled(f, ["cursor"]);
   });
 
-  await t.test("zed only needs neither Node nor overlays", (t) => {
+  await t.test("zed only needs no overlays", (t) => {
     const f = fixture(t);
-    fs.rmSync(path.join(f.bin, "node"));
     fs.rmSync(f.overlay);
     fs.rmSync(f.copilotOverlay);
     install(f, ["zed"]);
@@ -345,7 +342,6 @@ test("installer", { skip }, async (t) => {
 
   await t.test("cursor and zed leave invalid Claude settings untouched", (t) => {
     const f = fixture(t);
-    fs.rmSync(path.join(f.bin, "node"));
     fs.mkdirSync(path.dirname(f.settings));
     fs.writeFileSync(f.settings, "invalid local settings\n");
     fs.writeFileSync(f.overlay, "invalid overlay\n");
@@ -409,6 +405,8 @@ test("installer", { skip }, async (t) => {
     fs.rmSync(path.join(f.bin, "node"));
     for (const targets of [
       [],
+      ["cursor"],
+      ["zed"],
       ["claude"],
       ["copilot"],
       ["cursor", "zed", "claude"],
@@ -418,6 +416,22 @@ test("installer", { skip }, async (t) => {
       assert.match(result.stderr.toLowerCase(), /node 22\.18/);
       assert.match(result.stderr.toLowerCase(), /require|install|not found|missing/);
     }
+  });
+
+  await t.test("an older Node fails before installing", (t) => {
+    const f = fixture(t);
+    fs.rmSync(path.join(f.bin, "node"));
+    fs.writeFileSync(path.join(f.bin, "node"), "#!/bin/sh\necho 22.17.0\n", { mode: 0o755 });
+    const result = assertPreflightFailure(f);
+    assert.match(result.stderr, /Node 22\.18 or later \(found 22\.17\.0\)/);
+  });
+
+  await t.test("stale dependencies without npm fail before installing", (t) => {
+    const f = fixture(t);
+    fs.rmSync(path.join(f.repo, "node_modules"));
+    const result = assertPreflightFailure(f);
+    assert.match(result.stderr, /npm is needed/);
+    assert.ok(!fs.existsSync(f.agents));
   });
 
   await t.test("invalid destination JSON fails before adapters or links", (t) => {
@@ -491,7 +505,7 @@ test("installer", { skip }, async (t) => {
     }
   });
 
-  await t.test("user-managed instruction files are not overwritten", (t) => {
+  await t.test("user-managed instruction files fail the install before any change", (t) => {
     const f = fixture(t);
     const files: [string, string][] = [
       ["cursor", path.join(f.homes.CURSOR_HOME, "rules", "dotagents.mdc")],
@@ -502,12 +516,12 @@ test("installer", { skip }, async (t) => {
     for (const [target, file] of files) {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, "User-managed instructions.\n");
-      const result = install(f, [target], { success: false });
-      assert.ok(result.stderr.includes(file), result.stderr);
-      assert.ok(!fs.lstatSync(file).isSymbolicLink());
-      assert.equal(fs.readFileSync(file, "utf8"), "User-managed instructions.\n");
-      assert.ok(!fs.existsSync(f.settings));
-      assert.ok(!fs.existsSync(f.copilotSettings));
+      for (const targets of [[target], []]) {
+        const result = assertPreflightFailure(f, targets);
+        assert.ok(result.stderr.includes(file), result.stderr);
+        assert.ok(!fs.existsSync(f.agents));
+      }
+      fs.rmSync(file);
     }
   });
 
@@ -566,7 +580,7 @@ test("installer", { skip }, async (t) => {
     assert.ok(!fs.existsSync(f.agents));
   });
 
-  await t.test("user-managed skill folders are not replaced", (t) => {
+  await t.test("user-managed skill folders fail the install before any change", (t) => {
     const f = fixture(t);
     for (const [target, home] of [
       ["cursor", "AGENTS_HOME"],
@@ -576,10 +590,10 @@ test("installer", { skip }, async (t) => {
       const skill = path.join(f.homes[home], "skills", "test-skill");
       fs.mkdirSync(skill, { recursive: true });
       fs.writeFileSync(path.join(skill, "SKILL.md"), "Local skill.\n");
-      const result = install(f, [target], { success: false });
+      const result = assertPreflightFailure(f, [target]);
       assert.ok(result.stderr.includes(skill));
-      assert.ok(!fs.lstatSync(skill).isSymbolicLink());
-      assert.equal(fs.readFileSync(path.join(skill, "SKILL.md"), "utf8"), "Local skill.\n");
+      assert.ok(!fs.existsSync(f.agents));
+      fs.rmSync(f.homes[home], { recursive: true });
     }
   });
 
@@ -630,15 +644,15 @@ test("installer", { skip }, async (t) => {
     }
   });
 
-  await t.test("user-managed scripts are not replaced", (t) => {
+  await t.test("user-managed scripts fail the install before any change", (t) => {
     const f = fixture(t);
     addScript(f, "alpha/alpha-tool");
     const local = path.join(f.homes.AGENTS_HOME, "bin", "alpha-tool");
     fs.mkdirSync(path.dirname(local), { recursive: true });
     fs.writeFileSync(local, "local tool\n");
-    const result = install(f, ["zed"], { success: false });
+    const result = assertPreflightFailure(f, ["zed"]);
     assert.ok(result.stderr.includes(local));
-    assert.equal(fs.readFileSync(local, "utf8"), "local tool\n");
+    assert.ok(!fs.existsSync(f.agents));
   });
 
   await t.test("duplicate script names fail before installing", (t) => {
@@ -651,71 +665,6 @@ test("installer", { skip }, async (t) => {
     }
     assert.ok(!fs.existsSync(f.agents));
   });
-
-  await t.test(
-    "settings checks run before any change, and applies after each agent's link",
-    (t) => {
-      // Instrument only the fixture helper, keeping the real settings implementation
-      const f = fixture(t);
-      const helper = path.join(f.repo, "scripts", "apply-settings.ts");
-      fs.renameSync(helper, path.join(f.repo, "scripts", "real-apply-settings.ts"));
-      const log = path.join(f.root, "helper-calls.jsonl");
-      f.env.INSTALL_TEST_LOG = log;
-      fs.writeFileSync(
-        helper,
-        [
-          'import fs from "node:fs";',
-          'import path from "node:path";',
-          `const homes = ${JSON.stringify(HOME_NAMES)}.map((name) => process.env[name] ?? "");`,
-          "const isLink = (file: string) => fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink() ?? false;",
-          "const record = { args: process.argv.slice(2), homesExist: homes.map((home) => fs.existsSync(home)),",
-          '  claudeLink: isLink(path.join(homes[3] ?? "", "CLAUDE.md")),',
-          '  copilotLink: isLink(path.join(homes[4] ?? "", "copilot-instructions.md")) };',
-          'fs.appendFileSync(process.env.INSTALL_TEST_LOG ?? "", JSON.stringify(record) + "\\n");',
-          'await import("./real-apply-settings.ts");',
-        ].join("\n"),
-      );
-
-      // Both checks run read-only before any agent home exists
-      install(f);
-      const calls = fs
-        .readFileSync(log, "utf8")
-        .trim()
-        .split("\n")
-        .map(
-          (line) =>
-            JSON.parse(line) as {
-              args: string[];
-              homesExist: boolean[];
-              claudeLink: boolean;
-              copilotLink: boolean;
-            },
-        );
-      assert.equal(calls.length, 4);
-      const [claudeCheck, copilotCheck, claudeApply, copilotApply] = calls;
-      for (const call of [claudeCheck, copilotCheck]) {
-        assert.ok(call?.args.includes("--check"));
-        assert.deepEqual(
-          call?.homesExist,
-          HOME_NAMES.map(() => false),
-        );
-      }
-      for (const call of [claudeApply, copilotApply]) {
-        assert.ok(!call?.args.includes("--check"));
-      }
-
-      // Each apply targets its own agent and runs after that agent's link
-      assert.ok(claudeApply?.claudeLink);
-      assert.ok(copilotApply?.copilotLink);
-      for (const call of [claudeCheck, claudeApply]) {
-        assert.deepEqual(call?.args.slice(-2), [f.overlay, f.settings]);
-      }
-      for (const call of [copilotCheck, copilotApply]) {
-        assert.deepEqual(call?.args.slice(-2), [f.copilotOverlay, f.copilotSettings]);
-      }
-      assertInstalled(f, ["cursor", "zed", "claude", "copilot"]);
-    },
-  );
 });
 
 // MCP fixture: a command on the allowlisted PATH, and each agent's MCP config location
@@ -831,26 +780,10 @@ test("installer MCP servers", { skip }, async (t) => {
     }
   });
 
-  await t.test("missing Node fails before installing", (t) => {
+  await t.test("no declarations or state records no MCP state", (t) => {
     const m = mcpFixture(t);
-    m.addMcp("alpha/tool", { command: "tool" });
-    fs.rmSync(path.join(m.bin, "node"));
-    const result = assertPreflightFailure(m.f);
-    assert.match(result.stderr, /Node 22\.18/);
-  });
-
-  await t.test("missing dependencies without npm fail before installing", (t) => {
-    const m = mcpFixture(t);
-    m.addMcp("alpha/tool", { command: "tool" });
-    fs.rmSync(path.join(m.repo, "node_modules"));
-    const result = assertPreflightFailure(m.f);
-    assert.match(result.stderr, /npm/);
-  });
-
-  await t.test("no declarations or state need no Node", (t) => {
-    const m = mcpFixture(t);
-    fs.rmSync(path.join(m.bin, "node"));
-    install(m.f, ["cursor", "zed"]);
+    install(m.f);
     assert.ok(!fs.existsSync(path.join(m.homes.AGENTS_HOME, "state")));
+    assert.ok(!fs.existsSync(path.join(m.homes.HOME, ".claude.json")));
   });
 });

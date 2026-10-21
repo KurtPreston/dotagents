@@ -16,4 +16,4 @@ runs:
         TARGETS: ${{ inputs.targets }}
       run: |
         read -ra targets <<< "$TARGETS"
-        "$GITHUB_ACTION_PATH/scripts/install-runner.sh" "${targets[@]}"
+        "$GITHUB_ACTION_PATH/install.sh" --runner "${targets[@]}"
