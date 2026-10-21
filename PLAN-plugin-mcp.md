@@ -27,7 +27,7 @@ Out:
 
 ```json
 {
-  "command": "~/.local/share/mise/shims/npx",
+  "command": "npx",
   "args": ["-y", "mcp-remote@0.1.38", "https://mcp.linear.app/mcp", "3119"],
   "env": {}
 }
@@ -35,7 +35,9 @@ Out:
 
 - `command` is a required string. `args` is an optional array of strings, and `env` an optional object of strings. Any other key fails validation.
 - Names match `^[a-z0-9][a-z0-9_-]*$`. Two plugins declaring the same name fail the install before anything changes, like skills and scripts.
-- In `command`, `args`, and `env` values, a leading `~/`, `$HOME`, and `${HOME}` expand to the home directory. GUI apps don't inherit the shell's `PATH`, so commands need absolute paths, and expansion keeps those paths out of plugin files.
+- `command` names the program, not where it's installed. A bare name such as `npx` or `agency` is resolved at install time against the `PATH` of the shell running `./install.sh`, and the tool configs get the absolute path. GUI apps may not inherit that `PATH`, so they need absolute paths, but plugin files don't. If you switch from mise to nvm, rerunning `./install.sh` updates every server.
+- A bare name that isn't on `PATH` fails the install before anything changes, naming the server and the command.
+- `command` may also be an absolute path, or start with `~/`, for programs that aren't on `PATH`. Those are used as given, after expanding `~/`. `args` and `env` are passed through unchanged.
 
 ### Rendering per tool
 
@@ -53,7 +55,7 @@ Claude Code keeps user-scope MCP servers in `~/.claude.json`, not in `$CLAUDE_HO
 - `$AGENTS_HOME/state/mcp.json` records, per target, the server names dotagents installed: `{"zed": ["ado", ...], ...}`.
 - For each declared server, the tool's existing entry with the same name is handled in one of three ways:
   - **Recorded as managed:** replace it.
-  - **Not managed, but equal to the rendered entry:** adopt it. Equality treats a missing `args` as `[]` and a missing `env` as `{}`. This lets the six hand-added servers migrate without churn.
+  - **Not managed, but equal to the rendered entry:** adopt it. Equality treats a missing `args` as `[]` and a missing `env` as `{}`.
   - **Not managed and different:** fail with the target, file, and server name. Never print values.
 - Names that are recorded as managed but no longer declared are removed from the tool and from the state file.
 - Only selected targets are synced or pruned.
@@ -99,6 +101,7 @@ All tests use temporary homes and override variables, never real app config.
 ## User steps
 
 - **After phase 4:** quit Zed, Copilot CLI, Claude Code, and Cursor before the real install runs, then reopen them.
+- **Every install:** run `./install.sh` from a terminal whose `PATH` has `npx` and `agency`. Agent shells may not have `agency`, in which case the install fails and says so.
 - **After phase 4, in Claude Code and Cursor:** sign in when prompted. Slack and Linear open a browser through `mcp-remote` on ports `3118` and `3119`. If an `agency` server fails, run `agency mcp ado` once in a terminal to refresh the Entra token.
 
 ## Phases
@@ -106,8 +109,8 @@ All tests use temporary homes and override variables, never real app config.
 ### Phase 1: Declarations and rendering
 
 - Add `scripts/mcp/` with a `package.json` that depends only on `jsonc-parser`, a committed `package-lock.json`, and a `test` script using `node --test`. Ignore `scripts/mcp/node_modules/` in git.
-- Implement loading of plugin `mcp/` directories, validation (keys, types, names, duplicates across plugins), `HOME` expansion, and a renderer for each target.
-- Unit tests cover valid declarations, every validation error, expansion, and the rendered shape for each target.
+- Implement loading of plugin `mcp/` directories, validation (keys, types, names, duplicates across plugins), command resolution (bare names on `PATH`, absolute paths, `~/`), and a renderer for each target.
+- Unit tests cover valid declarations, every validation error, resolution against a temporary `PATH` (found, missing, absolute, `~/`), and the rendered shape for each target.
 - Done when `npm --prefix scripts/mcp test` passes.
 
 ### Phase 2: Config sync
@@ -135,13 +138,14 @@ All tests use temporary homes and override variables, never real app config.
 
 ### Phase 4: Move the existing servers
 
-- Add the six declarations to `plugins/microsoft/mcp/`, matching today's Zed and Copilot entries exactly, so the first install adopts them instead of failing.
+- Add the six declarations to `plugins/microsoft/mcp/`, using bare `npx` and `agency` and otherwise matching today's Zed and Copilot entries.
+- Resolved commands won't match the hand-written absolute paths in Zed and Copilot, so remove those six hand-added entries first. Back up each file, then delete only those keys while keeping comments. The first install then creates them as managed.
 - Update `plugins/microsoft/rules/mcp-servers.md` so it says Zed, Copilot, Claude Code, and Cursor sessions all connect to these servers, and that the servers are declared in `plugins/microsoft/mcp/`.
 - Commit in the `plugins/microsoft` repository.
 - After the user closes the apps, run `sync-mcp.mjs --check` against the real configs for all four targets, then `./install.sh`. Confirm the following, and paste the relevant lines into the report:
-  - Zed and Copilot show `unchanged` or adoption only.
-  - Claude and Cursor gain all six servers.
+  - All four tools have all six servers, with absolute command paths.
   - Zed's comments are intact.
+  - Zed actually starts the servers. The resolved `npx` is a `#!/usr/bin/env node` script rather than mise's shim, so it needs `node` on Zed's `PATH`. If it fails, log it under Obstacles and propose a fix, such as also resolving `node` into the server's `env.PATH`, instead of reverting to hard-coded shim paths.
 
 ## Obstacles
 
