@@ -12,7 +12,6 @@ Personal instructions, skills, MCP servers, and selected app settings for Cursor
 - `scripts/merge-settings.py` — strict JSON overlay helper with safe writes and backups, used by the installer.
 - `scripts/mcp/` — a small Node package that applies plugin MCP servers to each agent's config. See [MCP servers](#mcp-servers).
 - `tests/` — helper and installer tests using temporary configuration directories.
-- `autoreview/` — a Gitea Actions workflow in which two Copilot CLI agents deliberate a pull request; see [its README](autoreview/README.md).
 - `action.yml` and `scripts/install-runner.sh` — a composite action that installs dotagents on a CI runner. See [On a runner](#on-a-runner).
 - `install.sh` — generates `AGENTS.md`, then installs compatibility links, adapters, plugin skills and scripts, plugin MCP servers, and selected settings in each agent's global configuration.
 
@@ -194,7 +193,6 @@ Claude Code rewrites `~/.claude.json` while it runs, so install with Claude Code
 npm --prefix scripts/mcp ci && npm --prefix scripts/mcp test
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 bash -n install.sh
-(cd autoreview && npm ci && npm run typecheck && npm run lint && npm run format:check && npm test)
 ```
 
 Tests use temporary homes and configuration-directory overrides, never real application settings. The installer's MCP tests are skipped unless `scripts/mcp` has its dependencies installed.
