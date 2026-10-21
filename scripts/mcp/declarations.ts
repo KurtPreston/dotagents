@@ -1,8 +1,8 @@
 // Load MCP server declarations from plugins and resolve their commands.
 import fs from "node:fs";
 import path from "node:path";
-import { McpError, parseDocument } from "./json.ts";
-import type { JsonObject } from "./json.ts";
+import { InstallError, parseDocument } from "../lib/json.ts";
+import type { JsonObject } from "../lib/json.ts";
 import type { Server } from "./targets.ts";
 
 const NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
@@ -14,17 +14,17 @@ type Declaration = Pick<Server, "command" | "args" | "env">;
 function validate(value: JsonObject, label: string): Declaration {
   for (const key of Object.keys(value)) {
     if (!ALLOWED_KEYS.has(key)) {
-      throw new McpError(`${label}: unsupported key "${key}" (expected command, args, env)`);
+      throw new InstallError(`${label}: unsupported key "${key}" (expected command, args, env)`);
     }
   }
   if (typeof value.command !== "string" || value.command === "") {
-    throw new McpError(`${label}: "command" must be a non-empty string`);
+    throw new InstallError(`${label}: "command" must be a non-empty string`);
   }
 
   // args is a list of strings, env a map of strings
   const args = value.args ?? [];
   if (!Array.isArray(args) || !args.every((arg) => typeof arg === "string")) {
-    throw new McpError(`${label}: "args" must be an array of strings`);
+    throw new InstallError(`${label}: "args" must be an array of strings`);
   }
   const env = value.env ?? {};
   if (
@@ -33,7 +33,7 @@ function validate(value: JsonObject, label: string): Declaration {
     Array.isArray(env) ||
     !Object.values(env).every((item) => typeof item === "string")
   ) {
-    throw new McpError(`${label}: "env" must be an object of strings`);
+    throw new InstallError(`${label}: "env" must be an object of strings`);
   }
   return { command: value.command, args, env: env as Record<string, string> };
 }
@@ -58,13 +58,13 @@ export function loadDeclarations(pluginDirs: string[]): Server[] {
       const name = file.slice(0, -".json".length);
       const label = `plugins/${plugin}/mcp/${file}`;
       if (!NAME_PATTERN.test(name)) {
-        throw new McpError(`${label}: server names must match ${NAME_PATTERN}`);
+        throw new InstallError(`${label}: server names must match ${NAME_PATTERN}`);
       }
 
       // Server names share one namespace in every agent's config
       const owner = owners.get(name);
       if (owner !== undefined) {
-        throw new McpError(
+        throw new InstallError(
           `MCP server '${name}' is in both plugins/${owner} and plugins/${plugin} — rename one of them`,
         );
       }
@@ -104,7 +104,7 @@ export function resolveCommand(
   } else if (path.isAbsolute(command)) {
     resolved = command;
   } else if (command.includes("/")) {
-    throw new McpError(
+    throw new InstallError(
       `${label}: command "${command}" must be a bare name, an absolute path, or start with ~/`,
     );
   } else {
@@ -112,7 +112,7 @@ export function resolveCommand(
     const dirs = (searchPath ?? "").split(path.delimiter).filter((dir) => path.isAbsolute(dir));
     resolved = dirs.map((dir) => path.join(dir, command)).find(isExecutableFile);
     if (resolved === undefined) {
-      throw new McpError(
+      throw new InstallError(
         `${label}: command "${command}" was not found on PATH — run ./install.sh from a shell where it is`,
       );
     }
@@ -121,7 +121,7 @@ export function resolveCommand(
 
   // Paths given explicitly must still point at something runnable
   if (!isExecutableFile(resolved)) {
-    throw new McpError(`${label}: command "${command}" is not an executable file`);
+    throw new InstallError(`${label}: command "${command}" is not an executable file`);
   }
   return resolved;
 }

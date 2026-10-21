@@ -29,22 +29,44 @@ for target in "$@"; do
   esac
 done
 
-# Settings merges need Python before any mutation happens
-if [[ "$INSTALL_CLAUDE_SETTINGS" == true || "$INSTALL_COPILOT_SETTINGS" == true ]]; then
-  if ! command -v python3 >/dev/null 2>&1; then
-    echo "error: Claude and Copilot settings require Python 3; install python3 and rerun ./install.sh" >&2
+# Settings and MCP servers run on Node; check it and install dependencies once, before any mutation
+NODE_READY=false
+require_node() {
+  if [[ "$NODE_READY" == true ]]; then
+    return
+  fi
+  if ! command -v node >/dev/null 2>&1 || ! node -e '
+      const [major, minor] = process.versions.node.split(".").map(Number);
+      process.exit(major > 22 || (major === 22 && minor >= 18) ? 0 : 1);'; then
+    echo "error: settings and MCP servers require Node 22.18 or later; install node and rerun ./install.sh" >&2
     exit 1
   fi
-fi
+
+  # Install dependencies into the repository when missing or older than the lockfile
+  if [[ ! -e "$REPO_ROOT/node_modules/.package-lock.json" \
+      || "$REPO_ROOT/package-lock.json" -nt "$REPO_ROOT/node_modules/.package-lock.json" ]]; then
+    if ! command -v npm >/dev/null 2>&1; then
+      echo "error: npm is needed to install dotagents' dependencies; install npm and rerun ./install.sh" >&2
+      exit 1
+    fi
+    (cd "$REPO_ROOT" && npm ci --no-audit --no-fund --silent)
+  fi
+  NODE_READY=true
+}
+
+apply_settings() {
+  node "$REPO_ROOT/scripts/apply-settings.ts" "$@"
+}
 
 # Fail before mutations when any selected settings cannot be safely merged
+if [[ "$INSTALL_CLAUDE_SETTINGS" == true || "$INSTALL_COPILOT_SETTINGS" == true ]]; then
+  require_node
+fi
 if [[ "$INSTALL_CLAUDE_SETTINGS" == true ]]; then
-  python3 "$REPO_ROOT/scripts/merge-settings.py" --check \
-    "$REPO_ROOT/settings/claude.json" "$CLAUDE_HOME/settings.json"
+  apply_settings --check "$REPO_ROOT/settings/claude.json" "$CLAUDE_HOME/settings.json"
 fi
 if [[ "$INSTALL_COPILOT_SETTINGS" == true ]]; then
-  python3 "$REPO_ROOT/scripts/merge-settings.py" --check \
-    "$REPO_ROOT/settings/copilot.json" "$COPILOT_HOME/settings.json"
+  apply_settings --check "$REPO_ROOT/settings/copilot.json" "$COPILOT_HOME/settings.json"
 fi
 
 # The committed defaults plugin loads first, then every other plugin in name order
@@ -125,26 +147,10 @@ run_mcp_sync() {
     node "$MCP_DIR/sync-mcp.ts" "$@" --plugins "${PLUGINS[@]}" --targets "${TARGETS[@]}"
 }
 
-# MCP sync needs Node and its one dependency before anything is installed
+# MCP sync needs Node before anything is installed
 TARGETS=("$@")
 if [[ "$RUN_MCP" == true ]]; then
-  if ! command -v node >/dev/null 2>&1 \
-      || ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) < 18 ? 1 : 0)'; then
-    echo "error: plugins declare MCP servers, which require Node 18 or later; install node and rerun ./install.sh" >&2
-    exit 1
-  fi
-
-  # Install jsonc-parser into the repository when missing or older than the lockfile
-  if [[ ! -e "$REPO_ROOT/node_modules/.package-lock.json" \
-      || "$REPO_ROOT/package-lock.json" -nt "$REPO_ROOT/node_modules/.package-lock.json" ]]; then
-    if ! command -v npm >/dev/null 2>&1; then
-      echo "error: MCP sync needs npm to install its dependencies; install npm and rerun ./install.sh" >&2
-      exit 1
-    fi
-    (cd "$REPO_ROOT" && npm ci --no-audit --no-fund --silent)
-  fi
-
-  # Resolve commands and detect conflicts in every selected config before any changes
+  require_node
   run_mcp_sync --check
 fi
 
@@ -251,16 +257,14 @@ install_zed() {
 install_claude() {
   # Claude Code uses CLAUDE.md for personal standing instructions
   link_file "$REPO_ROOT/AGENTS.md" "$CLAUDE_HOME/CLAUDE.md"
-  python3 "$REPO_ROOT/scripts/merge-settings.py" \
-    "$REPO_ROOT/settings/claude.json" "$CLAUDE_HOME/settings.json"
+  apply_settings "$REPO_ROOT/settings/claude.json" "$CLAUDE_HOME/settings.json"
   INSTALL_CLAUDE_SKILLS=true
 }
 
 install_copilot() {
   # Copilot CLI and the VS Code agent read user instructions and settings here
   link_file "$REPO_ROOT/AGENTS.md" "$COPILOT_HOME/copilot-instructions.md"
-  python3 "$REPO_ROOT/scripts/merge-settings.py" \
-    "$REPO_ROOT/settings/copilot.json" "$COPILOT_HOME/settings.json"
+  apply_settings "$REPO_ROOT/settings/copilot.json" "$COPILOT_HOME/settings.json"
   INSTALL_SHARED_SKILLS=true
 }
 

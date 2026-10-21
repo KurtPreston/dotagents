@@ -1,5 +1,6 @@
 // Where each agent keeps its MCP servers, and the entry shape it expects.
 import path from "node:path";
+import { canonical, isObject } from "../lib/json.ts";
 
 export interface Server {
   name: string;
@@ -82,24 +83,8 @@ export function targetEnv(env: NodeJS.ProcessEnv): Homes {
   };
 }
 
-// Serialize with sorted object keys, so key order never affects comparison
-function canonical(value: unknown): string {
-  return JSON.stringify(value, (_key, item: unknown) =>
-    item && typeof item === "object" && !Array.isArray(item)
-      ? Object.fromEntries(
-          Object.keys(item)
-            .sort()
-            .map((name) => [name, (item as Record<string, unknown>)[name]]),
-        )
-      : item,
-  );
-}
-
 // Compare entries ignoring key order, treating missing args and env as empty
 export function sameEntry(a: unknown, b: unknown): boolean {
-  const normalize = (entry: unknown) =>
-    entry !== null && typeof entry === "object" && !Array.isArray(entry)
-      ? { args: [], env: {}, ...entry }
-      : entry;
+  const normalize = (entry: unknown) => (isObject(entry) ? { args: [], env: {}, ...entry } : entry);
   return canonical(normalize(a)) === canonical(normalize(b));
 }

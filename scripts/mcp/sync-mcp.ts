@@ -1,7 +1,7 @@
 // Apply MCP servers declared in dotagents plugins to the selected agents' configs.
 // Usage: node sync-mcp.ts [--check] --plugins <dir>... --targets <target>...
 import { loadServers } from "./declarations.ts";
-import { McpError } from "./json.ts";
+import { InstallError } from "../lib/json.ts";
 import { sync } from "./sync.ts";
 import { targetEnv } from "./targets.ts";
 
@@ -23,7 +23,7 @@ function parseArgs(argv: string[]): Options {
     } else if (list && !arg.startsWith("--")) {
       list.push(arg);
     } else {
-      throw new McpError(`unexpected argument '${arg}'`);
+      throw new InstallError(`unexpected argument '${arg}'`);
     }
   }
   return options;
@@ -33,14 +33,14 @@ function parseArgs(argv: string[]): Options {
 try {
   const options = parseArgs(process.argv.slice(2));
   if (!process.env.HOME) {
-    throw new McpError("HOME is not set");
+    throw new InstallError("HOME is not set");
   }
   const env = targetEnv(process.env);
   const servers = loadServers(options.plugins, { home: env.HOME, searchPath: process.env.PATH });
   sync({ servers, targets: options.targets, env, check: options.check });
 } catch (error) {
   // Filesystem errors carry paths but not configuration values
-  if (error instanceof McpError || (error as NodeJS.ErrnoException).code) {
+  if (error instanceof InstallError || (error as NodeJS.ErrnoException).code) {
     console.error(`error: ${(error as Error).message}`);
     process.exit(1);
   }

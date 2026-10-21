@@ -4,13 +4,13 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BASH = shutil.which("bash")
+NODE = shutil.which("node")
 EXPECTED_SETTINGS = {
     "attribution": {"commit": "", "pr": "", "sessionUrl": False},
     "env": {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
@@ -19,7 +19,8 @@ EXPECTED_SETTINGS = {
 EXPECTED_COPILOT_SETTINGS = {"includeCoAuthoredBy": False}
 
 
-@unittest.skipUnless(BASH, "installer integration tests require bash")
+@unittest.skipUnless(BASH and NODE and (REPO_ROOT / "node_modules").is_dir(),
+                     "installer integration tests require bash, node, and npm ci")
 class InstallTests(unittest.TestCase):
     def setUp(self):
         # Copy only installer inputs; never run against real application homes.
@@ -28,11 +29,14 @@ class InstallTests(unittest.TestCase):
         self.root = Path(self.directory.name)
         self.repo = self.root / "repository fixture"
         self.repo.mkdir()
-        for name in ("install.sh", "scripts/merge-settings.py",
-                     "settings/claude.json", "settings/copilot.json"):
+        for name in ("install.sh", "settings/claude.json", "settings/copilot.json",
+                     "package.json", "package-lock.json"):
             destination = self.repo / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(REPO_ROOT / name, destination)
+        shutil.copytree(REPO_ROOT / "scripts", self.repo / "scripts")
+        # Reuse this checkout's installed dependencies rather than running npm ci.
+        (self.repo / "node_modules").symlink_to(REPO_ROOT / "node_modules")
 
         # Default rules are copied; this machine's other plugins are not.
         self.plugins = self.repo / "plugins"
@@ -51,18 +55,16 @@ class InstallTests(unittest.TestCase):
         self.copilot_settings = self.homes["COPILOT_HOME"] / "settings.json"
         self.copilot_overlay = self.repo / "settings" / "copilot.json"
 
-        # An allowlisted PATH makes missing-Python tests independent of the host.
+        # An allowlisted PATH makes missing-Node tests independent of the host.
         self.bin = self.root / "bin"
         self.bin.mkdir()
         for command in ("dirname", "basename", "mkdir", "ln", "grep", "cat", "mv"):
             executable = shutil.which(command)
             self.assertIsNotNone(executable, "required shell utility: " + command)
             (self.bin / command).symlink_to(executable)
-        (self.bin / "python3").symlink_to(sys.executable)
+        (self.bin / "node").symlink_to(NODE)
         self.env = {name: str(path) for name, path in self.homes.items()}
         self.env["PATH"] = str(self.bin)
-        # Apple's Python otherwise caches bytecode under the fixture HOME.
-        self.env["PYTHONDONTWRITEBYTECODE"] = "1"
 
     def install(self, *targets, success=True):
         result = subprocess.run(
@@ -196,22 +198,22 @@ class InstallTests(unittest.TestCase):
         backups = list(self.copilot_settings.parent.glob("settings.json.*.bak"))
         self.assertEqual(len(backups), 1)
 
-    def test_cursor_only_does_not_require_python_or_valid_overlays(self):
-        (self.bin / "python3").unlink()
+    def test_cursor_only_does_not_require_node_or_valid_overlays(self):
+        (self.bin / "node").unlink()
         self.overlay.write_text("not JSON", encoding="utf-8")
         self.copilot_overlay.write_text("not JSON", encoding="utf-8")
         self.install("cursor")
         self.assert_installed("cursor")
 
-    def test_zed_only_does_not_require_python_or_overlays(self):
-        (self.bin / "python3").unlink()
+    def test_zed_only_does_not_require_node_or_overlays(self):
+        (self.bin / "node").unlink()
         self.overlay.unlink()
         self.copilot_overlay.unlink()
         self.install("zed")
         self.assert_installed("zed")
 
     def test_cursor_and_zed_leave_invalid_claude_settings_untouched(self):
-        (self.bin / "python3").unlink()
+        (self.bin / "node").unlink()
         self.settings.parent.mkdir()
         self.settings.write_bytes(b"invalid local settings\n")
         self.overlay.write_bytes(b"invalid overlay\n")
@@ -262,14 +264,14 @@ class InstallTests(unittest.TestCase):
                 self.assertIn("unknown target", result.stderr)
                 self.assertIn("unknown", result.stderr)
 
-    def test_missing_python_fails_before_any_selected_integration(self):
-        (self.bin / "python3").unlink()
-        self.assertIsNone(shutil.which("python3", path=self.env["PATH"]))
+    def test_missing_node_fails_before_any_selected_integration(self):
+        (self.bin / "node").unlink()
+        self.assertIsNone(shutil.which("node", path=self.env["PATH"]))
         for targets in ((), ("claude",), ("copilot",), ("cursor", "zed", "claude"),
                         ("cursor", "copilot")):
             with self.subTest(targets=targets):
                 result = self.assert_preflight_failure(*targets)
-                self.assertIn("python3", result.stderr.lower())
+                self.assertIn("node 22.18", result.stderr.lower())
                 self.assertRegex(result.stderr.lower(), r"require|install|not found|missing")
 
     def test_invalid_destination_json_fails_before_adapters_or_links(self):
@@ -475,23 +477,23 @@ class InstallTests(unittest.TestCase):
         self.assertFalse(self.agents.exists())
 
     def test_helper_checks_precede_mutations_and_applies_follow_links(self):
-        # Instrument only the fixture helper, retaining the real merge implementation.
-        helper = self.repo / "scripts" / "merge-settings.py"
-        helper.rename(helper.with_name("real-merge-settings.py"))
+        # Instrument only the fixture helper, retaining the real settings implementation.
+        helper = self.repo / "scripts" / "apply-settings.ts"
+        helper.rename(helper.with_name("real-apply-settings.ts"))
         log = self.root / "helper-calls.jsonl"
         self.env["INSTALL_TEST_LOG"] = str(log)
         helper.write_text(
-            "import json, os, pathlib, runpy, sys\n"
-            "homes = [pathlib.Path(os.environ[name]) for name in "
-            "('HOME', 'CURSOR_HOME', 'ZED_HOME', 'CLAUDE_HOME', 'COPILOT_HOME', "
-            "'AGENTS_HOME')]\n"
-            "record = {'args': sys.argv[1:], 'homes_exist': [p.exists() for p in homes], "
-            "'claude_link': (homes[3] / 'CLAUDE.md').is_symlink(), "
-            "'copilot_link': (homes[4] / 'copilot-instructions.md').is_symlink()}\n"
-            "with open(os.environ['INSTALL_TEST_LOG'], 'a') as stream:\n"
-            "    stream.write(json.dumps(record) + '\\n')\n"
-            "runpy.run_path(str(pathlib.Path(__file__).with_name('real-merge-settings.py')), "
-            "run_name='__main__')\n", encoding="utf-8")
+            'import fs from "node:fs";\n'
+            'import path from "node:path";\n'
+            'const homes = ["HOME", "CURSOR_HOME", "ZED_HOME", "CLAUDE_HOME", "COPILOT_HOME",'
+            ' "AGENTS_HOME"].map((name) => process.env[name] ?? "");\n'
+            'const isLink = (file: string) => fs.lstatSync(file, { throwIfNoEntry: false })'
+            '?.isSymbolicLink() ?? false;\n'
+            'const record = { args: process.argv.slice(2), homes_exist: homes.map((home) =>'
+            ' fs.existsSync(home)), claude_link: isLink(path.join(homes[3] ?? "", "CLAUDE.md")),'
+            ' copilot_link: isLink(path.join(homes[4] ?? "", "copilot-instructions.md")) };\n'
+            'fs.appendFileSync(process.env.INSTALL_TEST_LOG ?? "", JSON.stringify(record) + "\\n");\n'
+            'await import("./real-apply-settings.ts");\n', encoding="utf-8")
 
         # Both checks run read-only before any agent home exists.
         self.install()
@@ -516,27 +518,11 @@ class InstallTests(unittest.TestCase):
         self.assert_installed("cursor", "zed", "claude", "copilot")
 
 
-NODE = shutil.which("node")
-MCP_SOURCES = REPO_ROOT / "scripts" / "mcp"
-
-
-@unittest.skipUnless(BASH and NODE and (REPO_ROOT / "node_modules").is_dir(),
-                     "MCP installer tests require bash, node, and npm ci")
 class McpInstallTests(InstallTests):
     # Reuse InstallTests' fixture, but only run the MCP tests defined here.
     def setUp(self):
         super().setUp()
-        # Copy the sync script and reuse this checkout's installed dependencies.
-        destination = self.repo / "scripts" / "mcp"
-        destination.mkdir(parents=True)
-        for source in MCP_SOURCES.glob("*.ts"):
-            shutil.copy2(source, destination / source.name)
-        for name in ("package.json", "package-lock.json"):
-            shutil.copy2(REPO_ROOT / name, self.repo / name)
-        (self.repo / "node_modules").symlink_to(REPO_ROOT / "node_modules")
-
-        # Node is on the allowlisted PATH, along with a command for servers to resolve.
-        (self.bin / "node").symlink_to(NODE)
+        # A command on the allowlisted PATH for servers to resolve
         self.tool = self.bin / "tool"
         self.tool.write_text("#!/bin/sh\n", encoding="utf-8")
         self.tool.chmod(0o755)
@@ -625,7 +611,7 @@ class McpInstallTests(InstallTests):
         self.add_mcp("alpha", "tool", {"command": "tool"})
         (self.bin / "node").unlink()
         result = self.assert_preflight_failure()
-        self.assertIn("Node 18", result.stderr)
+        self.assertIn("Node 22.18", result.stderr)
 
     def test_missing_dependencies_without_npm_fail_before_installation(self):
         self.add_mcp("alpha", "tool", {"command": "tool"})
@@ -635,7 +621,7 @@ class McpInstallTests(InstallTests):
 
     def test_no_declarations_or_state_do_not_need_node(self):
         (self.bin / "node").unlink()
-        self.install()
+        self.install("cursor", "zed")
         self.assertFalse((self.homes["AGENTS_HOME"] / "state").exists())
 
 

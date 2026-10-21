@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { loadDeclarations, loadServers, resolveCommand } from "../scripts/mcp/declarations.ts";
-import { McpError, parseDocument } from "../scripts/mcp/json.ts";
+import { InstallError, parseDocument } from "../scripts/lib/json.ts";
 import { TARGETS, sameEntry, targetEnv } from "../scripts/mcp/targets.ts";
 
 // Name and label are irrelevant to rendering, so tests fill them in
@@ -147,7 +147,7 @@ test("loadServers resolves every command before returning", (t) => {
   declare(root, "p/other", { command: "missing" });
   assert.throws(
     () => loadServers([plugin], { home: root, searchPath: path.join(root, "bin") }),
-    McpError,
+    InstallError,
   );
 });
 
