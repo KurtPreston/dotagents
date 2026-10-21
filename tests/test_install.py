@@ -490,5 +490,132 @@ class InstallTests(unittest.TestCase):
                              [str(self.copilot_overlay), str(self.copilot_settings)])
         self.assert_installed("cursor", "zed", "claude", "copilot")
 
+
+NODE = shutil.which("node")
+MCP_SOURCES = REPO_ROOT / "scripts" / "mcp"
+
+
+@unittest.skipUnless(BASH and NODE and (MCP_SOURCES / "node_modules").is_dir(),
+                     "MCP installer tests require bash, node, and npm ci in scripts/mcp")
+class McpInstallTests(InstallTests):
+    # Reuse InstallTests' fixture, but only run the MCP tests defined here.
+    def setUp(self):
+        super().setUp()
+        # Copy the sync script and reuse this checkout's installed dependency.
+        destination = self.repo / "scripts" / "mcp"
+        destination.mkdir(parents=True)
+        for source in MCP_SOURCES.iterdir():
+            if source.suffix in (".mjs", ".json"):
+                shutil.copy2(source, destination / source.name)
+        (destination / "node_modules").symlink_to(MCP_SOURCES / "node_modules")
+
+        # Node is on the allowlisted PATH, along with a command for servers to resolve.
+        (self.bin / "node").symlink_to(NODE)
+        self.tool = self.bin / "tool"
+        self.tool.write_text("#!/bin/sh\n", encoding="utf-8")
+        self.tool.chmod(0o755)
+        self.configs = {
+            "zed": (self.homes["ZED_HOME"] / "settings.json", "context_servers"),
+            "copilot": (self.homes["COPILOT_HOME"] / "mcp-config.json", "mcpServers"),
+            "claude": (self.homes["HOME"] / ".claude.json", "mcpServers"),
+            "cursor": (self.homes["CURSOR_HOME"] / "mcp.json", "mcpServers"),
+        }
+
+    def add_mcp(self, plugin, name, declaration):
+        path = self.plugins / plugin / "mcp" / (name + ".json")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(declaration), encoding="utf-8")
+        return path
+
+    def servers(self, target):
+        path, key = self.configs[target]
+        return json.loads(path.read_text(encoding="utf-8")).get(key, {})
+
+    def test_mcp_servers_reach_every_agent(self):
+        self.add_mcp("alpha", "tool", {"command": "tool", "args": ["--serve"]})
+        result = self.install()
+        for target in self.configs:
+            with self.subTest(target=target):
+                server = self.servers(target)["tool"]
+                self.assertEqual(server["command"], str(self.tool))
+                self.assertEqual(server["args"], ["--serve"])
+        self.assertEqual(self.servers("copilot")["tool"]["tools"], ["*"])
+        self.assertEqual(self.servers("claude")["tool"]["type"], "stdio")
+        self.assertIn("validated", result.stdout)
+
+        # Rerunning leaves every MCP config and the state file untouched.
+        files = [path for path, _ in self.configs.values()]
+        files.append(self.homes["AGENTS_HOME"] / "state" / "mcp.json")
+        stamp = lambda: [(path.read_bytes(), path.stat().st_mtime_ns) for path in files]
+        before = stamp()
+        result = self.install()
+        self.assertEqual(stamp(), before)
+        self.assertNotIn("backup", result.stdout)
+
+    def test_selected_targets_only(self):
+        self.add_mcp("alpha", "tool", {"command": "tool"})
+        self.install("cursor")
+        self.assertIn("tool", self.servers("cursor"))
+        for target in ("zed", "copilot", "claude"):
+            self.assertFalse(self.configs[target][0].exists(), target)
+
+    def test_removed_declarations_are_pruned(self):
+        kept = self.add_mcp("alpha", "kept", {"command": "tool"})
+        dropped = self.add_mcp("alpha", "dropped", {"command": "tool"})
+        self.install("zed", "cursor")
+        dropped.unlink()
+        self.install("zed", "cursor")
+        for target in ("zed", "cursor"):
+            self.assertEqual(list(self.servers(target)), ["kept"])
+
+        # Removing the last declaration still prunes, using the recorded state.
+        kept.unlink()
+        self.install("zed", "cursor")
+        for target in ("zed", "cursor"):
+            self.assertEqual(self.servers(target), {})
+
+    def test_unmanaged_conflict_fails_before_installation(self):
+        self.add_mcp("alpha", "tool", {"command": "tool"})
+        path, _ = self.configs["cursor"]
+        path.parent.mkdir(parents=True)
+        path.write_text('{"mcpServers": {"tool": {"command": "/elsewhere"}}}', encoding="utf-8")
+        result = self.assert_preflight_failure()
+        self.assertIn("didn't install", result.stderr)
+        self.assertFalse(self.agents.exists())
+
+    def test_unresolvable_command_fails_before_installation(self):
+        self.add_mcp("alpha", "tool", {"command": "absent"})
+        result = self.assert_preflight_failure()
+        self.assertIn('command "absent" was not found on PATH', result.stderr)
+
+    def test_duplicate_server_names_fail_before_installation(self):
+        self.add_mcp("alpha", "tool", {"command": "tool"})
+        self.add_mcp("zeta", "tool", {"command": "tool"})
+        result = self.assert_preflight_failure()
+        for text in ("'tool'", "plugins/alpha", "plugins/zeta"):
+            self.assertIn(text, result.stderr)
+
+    def test_missing_node_fails_before_installation(self):
+        self.add_mcp("alpha", "tool", {"command": "tool"})
+        (self.bin / "node").unlink()
+        result = self.assert_preflight_failure()
+        self.assertIn("Node 18", result.stderr)
+
+    def test_missing_dependencies_without_npm_fail_before_installation(self):
+        self.add_mcp("alpha", "tool", {"command": "tool"})
+        (self.repo / "scripts" / "mcp" / "node_modules").unlink()
+        result = self.assert_preflight_failure()
+        self.assertIn("npm", result.stderr)
+
+    def test_no_declarations_or_state_do_not_need_node(self):
+        (self.bin / "node").unlink()
+        self.install()
+        self.assertFalse((self.homes["AGENTS_HOME"] / "state").exists())
+
+
+# Only the MCP tests run in McpInstallTests; InstallTests already covers the rest.
+for _name in [name for name in vars(InstallTests) if name.startswith("test_")]:
+    setattr(McpInstallTests, _name, None)
+
 if __name__ == "__main__":
     unittest.main()
