@@ -1,0 +1,19 @@
+name: dotagents
+description: Install dotagents' standing instructions, skills and settings on a runner, for the agents later steps run.
+
+inputs:
+  targets:
+    description: Space-separated install.sh targets (cursor, zed, claude, copilot).
+    default: copilot
+
+runs:
+  using: composite
+  steps:
+    # Install into temporary homes, and export them for later steps
+    - name: Install dotagents
+      shell: bash
+      env:
+        TARGETS: ${{ inputs.targets }}
+      run: |
+        read -ra targets <<< "$TARGETS"
+        "$GITHUB_ACTION_PATH/scripts/install-runner.sh" "${targets[@]}"
