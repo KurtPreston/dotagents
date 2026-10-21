@@ -59,9 +59,9 @@ export class Checkout {
     }
   }
 
-  /** The diff between two commits. */
-  async diff(from: string, to: string): Promise<string> {
-    return this.git("diff", "--no-color", `${from}..${to}`);
+  /** The diff between two commits, optionally only in some paths. */
+  async diff(from: string, to: string, paths?: string[]): Promise<string> {
+    return this.git("diff", "--no-color", `${from}..${to}`, ...(paths ? ["--", ...paths] : []));
   }
 
   /** Lines around one line of a file, numbered, or a note when the file is gone. */
@@ -102,6 +102,15 @@ export class Checkout {
 
 function tail(text: string, limit = 4000): string {
   return text.length > limit ? `…${text.slice(-limit)}` : text;
+}
+
+/** Every path a unified diff touches, on either side. */
+export function changedFiles(diff: string): string[] {
+  const paths = new Set<string>();
+  for (const match of diff.matchAll(/^(?:---|\+\+\+) [ab]\/(.+)$/gm)) {
+    paths.add(match[1]);
+  }
+  return [...paths];
 }
 
 /**
