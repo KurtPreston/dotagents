@@ -160,6 +160,31 @@ class InstallTests(unittest.TestCase):
         self.install("copilot")
         self.assert_installed("copilot")
 
+    def test_runner_install_uses_runner_temp_and_exports_homes(self):
+        # Run the action's script as a runner would, with no agent homes set.
+        script = self.repo / "scripts" / "install-runner.sh"
+        shutil.copy2(REPO_ROOT / "scripts" / "install-runner.sh", script)
+        (self.bin / "bash").symlink_to(BASH)
+        runner_temp = self.root / "runner temp"
+        github_env = self.root / "github env"
+        env = {key: value for key, value in self.env.items() if not key.endswith("_HOME")}
+        env.update(RUNNER_TEMP=str(runner_temp),
+                   GITHUB_ENV=str(github_env))
+        result = subprocess.run([BASH, str(script)], cwd=self.root, env=env,
+                                capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        # Copilot alone is installed under RUNNER_TEMP, and every home is exported.
+        copilot = runner_temp / "dotagents" / "copilot"
+        self.assert_link(copilot / "copilot-instructions.md", self.repo / "AGENTS.md")
+        self.assertFalse((runner_temp / "dotagents" / "claude").exists())
+        exported = dict(line.split("=", 1)
+                        for line in github_env.read_text(encoding="utf-8").splitlines())
+        self.assertEqual(exported["COPILOT_HOME"], str(copilot))
+        self.assertEqual(set(exported), {"CURSOR_HOME", "ZED_HOME", "CLAUDE_HOME",
+                                         "COPILOT_HOME", "AGENTS_HOME"})
+        self.assertFalse(self.homes["HOME"].exists())
+
     def test_copilot_preserves_local_settings(self):
         # Copilot owns most of its settings; only the declared key is enforced.
         self.copilot_settings.parent.mkdir()

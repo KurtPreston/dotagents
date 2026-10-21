@@ -12,7 +12,7 @@ Personal instructions, skills, MCP servers, and selected app settings for Cursor
 - `scripts/merge-settings.py` — strict JSON overlay helper with safe writes and backups, used by the installer.
 - `scripts/mcp/` — a small Node package that applies plugin MCP servers to each agent's config. See [MCP servers](#mcp-servers).
 - `tests/` — helper and installer tests using temporary configuration directories.
-- `autoreview/` — a Gitea Actions workflow in which two Copilot CLI agents deliberate a pull request; see [its README](autoreview/README.md).
+- `action.yml` and `scripts/install-runner.sh` — a composite action that installs dotagents on a CI runner. See [On a runner](#on-a-runner).
 - `install.sh` — generates `AGENTS.md`, then installs compatibility links, adapters, plugin skills and scripts, plugin MCP servers, and selected settings in each agent's global configuration.
 
 Edit a rule, a skill, or a settings overlay in this repository, then commit the change normally. Put rules, skills, and scripts that don't belong in the defaults, such as which GitHub account to use or a skill that posts to a team's chat channel, in another plugin instead. Installed links and adapters are installation details; app settings files also retain locally managed values.
@@ -79,6 +79,18 @@ ZED_HOME="$HOME/custom-zed" ./install.sh zed
 ```
 
 Run the installer again after editing a rule, adding a skill or plugin, or editing a settings overlay. Agents only see rule changes once `AGENTS.md` is regenerated.
+
+## On a runner
+
+This repository is also a GitHub or Gitea Actions action. It installs dotagents into temporary homes under `$RUNNER_TEMP` and exports their paths, such as `COPILOT_HOME`, to later steps. Agents those steps run, such as a review bot using the Copilot CLI, then follow these instructions and settings. Put it before the step that runs the agent:
+
+```yaml
+- uses: https://github.com/KurtPreston/dotagents@main
+  with:
+    targets: copilot # the default; any of cursor, zed, claude, copilot
+```
+
+The runner needs `python3` for the Claude and Copilot settings, and Node when a plugin declares MCP servers.
 
 ## App settings
 
@@ -181,7 +193,6 @@ Claude Code rewrites `~/.claude.json` while it runs, so install with Claude Code
 npm --prefix scripts/mcp ci && npm --prefix scripts/mcp test
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 bash -n install.sh
-(cd autoreview && npm ci && npm run typecheck && npm run lint && npm run format:check && npm test)
 ```
 
 Tests use temporary homes and configuration-directory overrides, never real application settings. The installer's MCP tests are skipped unless `scripts/mcp` has its dependencies installed.
