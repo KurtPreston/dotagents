@@ -10,7 +10,7 @@ Read this before changing dotagents. Each entry says what to do and why.
 
 ## Simplicity over per-part tuning
 
-- The whole repository, including `autoreview/`, shares one `package.json`, one lockfile, one Node version requirement, and one set of TypeScript, lint, and format settings. Don't give one part its own versions or config, even if that means churn when something is upgraded for one part.
+- The whole repository shares one `package.json`, one lockfile, one Node version requirement, and one set of TypeScript, lint, and format settings. Don't give one part its own versions or config, even if that means churn when something is upgraded for one part. Tools that grow into their own products, as `autoreview` did, belong in their own repositories.
 - This is a young project with one user, so prefer one clean implementation over keeping old behavior, formats, or edge cases working. Edge cases that are unlikely in practice don't justify extra code or a second path. Formatting of files the installer edits doesn't matter.
 
 ## Plugins
