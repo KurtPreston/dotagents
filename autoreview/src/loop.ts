@@ -1,7 +1,7 @@
 import { implementerPermissions, reviewerPermissions, runAgent, type Usage } from "./agent.ts";
 import type { Config } from "./config.ts";
 import type { Forge, NewComment, PullRequest, Thread } from "./forge.ts";
-import { diffLines, type Checkout } from "./git.ts";
+import { changedFiles, diffLines, type Checkout } from "./git.ts";
 import { compose, plainText, readMarker, type Marker } from "./markers.ts";
 import { clip, common, render } from "./prompts.ts";
 import {
@@ -162,12 +162,18 @@ async function reviewNew(run: Deliberation, pr: PullRequest): Promise<boolean> {
     return false;
   }
 
-  // Since the last run, only the new commits; fall back to everything if history was rewritten
+  // Since the last run, only the new commits, in files the pull request changes (so a merge
+  // from the base isn't reviewed as its own); everything if history was rewritten
+  const whole = await run.reviewer.diff(run.number);
   let diff: string | undefined;
   if (last) {
-    diff = await run.checkout.diff(last, pr.headSha).catch(() => undefined);
+    const files = changedFiles(whole);
+    diff =
+      files.length === 0
+        ? ""
+        : await run.checkout.diff(last, pr.headSha, files).catch(() => undefined);
   }
-  diff ??= await run.reviewer.diff(run.number);
+  diff ??= whole;
   if (diff.trim() === "") {
     return false;
   }

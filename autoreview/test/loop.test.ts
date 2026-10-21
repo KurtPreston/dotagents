@@ -54,6 +54,8 @@ interface Setup {
   work: string;
   origin: string;
   calls: { review: number; implement: number; verify: number };
+  /** Each review's task, as the reviewer saw it. */
+  reviews: string[];
   run: () => Promise<Outcome>;
 }
 
@@ -86,8 +88,12 @@ function setup(
 
   // Agents play back the script, counting calls
   const calls = { review: 0, implement: 0, verify: 0 };
+  const reviews: string[] = [];
   const agents: Agents = {
-    review: async () => script.review?.[calls.review++] ?? { summary: "Looks fine.", findings: [] },
+    review: async (task) => {
+      reviews.push(task);
+      return script.review?.[calls.review++] ?? { summary: "Looks fine.", findings: [] };
+    },
     implement: async (task) => {
       const step = script.implement?.[calls.implement++];
       assert.ok(step, "unexpected implementer call");
@@ -115,7 +121,7 @@ function setup(
       force: false,
       log: () => {},
     });
-  return { store, work, origin, calls, run };
+  return { store, work, origin, calls, reviews, run };
 }
 
 const finding = {
@@ -368,4 +374,29 @@ test("a rerun with nothing new posts nothing", async () => {
   const outcome = await first.run();
   assert.match(outcome.skipped ?? "", /nothing new/);
   assert.equal(first.store.comments.length, posted);
+});
+
+test("a later run reviews the pull request's new commits, not a merge from the base", async () => {
+  const { store, work, reviews, run } = setup({});
+  await run();
+
+  // main moves on in a file the pull request doesn't touch
+  git(work, "checkout", "--quiet", "main");
+  writeFileSync(join(work, "README.md"), "hi\nfrom main\n");
+  git(work, "commit", "--quiet", "-am", "Main moves on");
+
+  // The branch merges main, then changes its own file
+  git(work, "checkout", "--quiet", "ferns");
+  git(work, "merge", "--quiet", "--no-edit", "main");
+  writeFileSync(join(work, "a.ts"), FILE.replace("n * 2", "n * 3"));
+  git(work, "commit", "--quiet", "-am", "Triple instead");
+  git(work, "checkout", "--quiet", "--detach");
+  store.pr.headSha = git(work, "rev-parse", "HEAD");
+  store.diff = git(work, "diff", "main...HEAD");
+  await run();
+
+  // The second review saw the new change, and nothing of main's
+  assert.equal(reviews.length, 2);
+  assert.match(reviews[1], /\+  return n \* 3;/);
+  assert.doesNotMatch(reviews[1], /from main/);
 });
