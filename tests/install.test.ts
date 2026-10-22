@@ -723,6 +723,22 @@ test("installer MCP servers", { skip }, async (t) => {
     assert.doesNotMatch(rerun.stdout, /backup/);
   });
 
+  await t.test("on-demand servers are not installed", (t) => {
+    const m = mcpFixture(t);
+    m.addMcp("alpha/tool", { command: "tool", tools: ["read"] });
+    m.addMcp("alpha/lazy", { command: "tool", load: "on-demand" });
+    install(m.f);
+
+    // Only the static server reaches each agent, with its allowlist on Copilot
+    for (const target of Object.keys(m.configs)) {
+      assert.ok(m.servers(target).tool, target);
+      assert.ok(!m.servers(target).lazy, target);
+    }
+    assert.deepEqual(m.servers("copilot").tool?.tools, ["read"]);
+    const state = fs.readFileSync(path.join(m.homes.AGENTS_HOME, "state", "mcp.json"), "utf8");
+    assert.doesNotMatch(state, /lazy/);
+  });
+
   await t.test("only selected targets get servers", (t) => {
     const m = mcpFixture(t);
     m.addMcp("alpha/tool", { command: "tool" });

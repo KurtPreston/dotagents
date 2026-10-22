@@ -9,6 +9,10 @@ export interface Server {
   command: string;
   args: string[];
   env: Record<string, string>;
+  // Installed into no agent; reached through the mcp-call CLI instead
+  onDemand?: boolean;
+  // Tool allowlist, for agents whose config supports one
+  tools?: string[];
 }
 
 export interface Homes {
@@ -44,12 +48,12 @@ export const TARGETS: Record<TargetName, Target> = {
     file: (homes) => path.join(homes.COPILOT_HOME, "mcp-config.json"),
     key: "mcpServers",
     jsonc: false,
-    render: ({ command, args, env }) => ({
+    render: ({ command, args, env, tools }) => ({
       type: "stdio",
       command,
       args,
       ...(Object.keys(env).length > 0 ? { env } : {}),
-      tools: ["*"],
+      tools: tools ?? ["*"],
     }),
   },
   claude: {
