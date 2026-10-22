@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { InstallError } from "./lib/json.ts";
+import { findPlugins, isDirectory, list } from "./lib/plugins.ts";
 import { loadServers } from "./mcp/declarations.ts";
 import { sync } from "./mcp/sync.ts";
 import { applySettings } from "./settings.ts";
@@ -74,29 +75,6 @@ function parseTargets(args: string[], runner: boolean): Target[] {
     return runner ? ["copilot"] : [...TARGET_NAMES];
   }
   return args as Target[];
-}
-
-// Sorted entries of a folder, skipping hidden ones as shell globs do, or none when it doesn't exist
-function list(dir: string): string[] {
-  return fs.existsSync(dir)
-    ? fs
-        .readdirSync(dir)
-        .filter((name) => !name.startsWith("."))
-        .sort()
-    : [];
-}
-
-const isDirectory = (file: string) =>
-  fs.statSync(file, { throwIfNoEntry: false })?.isDirectory() ?? false;
-
-// The committed defaults plugin loads first, then every other plugin in name order
-function findPlugins(): string[] {
-  const pluginsDir = path.join(REPO_ROOT, "plugins");
-  const defaults = path.join(pluginsDir, "dotagents-defaults");
-  const others = list(pluginsDir)
-    .map((name) => path.join(pluginsDir, name))
-    .filter((dir) => dir !== defaults && isDirectory(dir));
-  return [defaults, ...others];
 }
 
 // Collect one kind of plugin content by name, failing on a name two plugins share
@@ -180,7 +158,7 @@ function main(argv: string[]): void {
   const agents = path.join(REPO_ROOT, "AGENTS.md");
 
   // Find plugin content, failing on names two plugins share
-  const plugins = findPlugins();
+  const plugins = findPlugins(REPO_ROOT);
   const skills = collect(plugins, { kind: "skill", accept: isDirectory });
   const scripts = collect(plugins, { kind: "script", accept: isExecutable });
   const rules = findRules(plugins);
