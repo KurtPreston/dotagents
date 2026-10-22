@@ -12,7 +12,7 @@ import { TARGETS, sameEntry, targetEnv } from "../scripts/mcp/targets.ts";
 // Name and label are irrelevant to rendering, so tests fill them in
 const render = (
   target: keyof typeof TARGETS,
-  fields: { command: string; args: string[]; env: Record<string, string> },
+  fields: { command: string; args: string[]; env: Record<string, string>; tools?: string[] },
 ) => TARGETS[target].render({ name: "x", label: "x", ...fields });
 
 // Make a fresh temporary directory removed after the test
@@ -61,6 +61,16 @@ test("loads declarations in plugin order and fills defaults", (t) => {
   });
 });
 
+test("keeps load and tools only when set", (t) => {
+  const root = tempDir(t);
+  const plugin = declare(root, "p/lazy", { command: "npx", load: "on-demand", tools: ["a"] });
+  declare(root, "p/plain", { command: "npx", load: "static" });
+  const [lazy, plain] = loadDeclarations([plugin]);
+  assert.equal(lazy.onDemand, true);
+  assert.deepEqual(lazy.tools, ["a"]);
+  assert.ok(!("onDemand" in plain) && !("tools" in plain));
+});
+
 test("skips plugins without an mcp folder", (t) => {
   const root = tempDir(t);
   fs.mkdirSync(path.join(root, "empty"));
@@ -78,6 +88,9 @@ test("rejects invalid declarations", async (t) => {
     comments: ['{ // no\n "command": "npx" }', /invalid JSON/],
     "duplicate key": ['{"command": "a", "command": "b"}', /duplicate JSON key/],
     "array root": ["[]", /root must be an object/],
+    "bad load": [{ command: "npx", load: "lazy" }, /"load" must be "static" or "on-demand"/],
+    "empty tools": [{ command: "npx", tools: [] }, /"tools" must be a non-empty array/],
+    "non-string tools": [{ command: "npx", tools: [1] }, /"tools" must be a non-empty array/],
   };
   for (const [description, [content, pattern]] of Object.entries(cases)) {
     await t.test(description, (t) => {
@@ -168,6 +181,7 @@ test("renders each target's entry shape", () => {
     tools: ["*"],
   });
   assert.deepEqual(render("copilot", { ...server, env: { A: "1" } }).env, { A: "1" });
+  assert.deepEqual(render("copilot", { ...server, tools: ["a"] }).tools, ["a"]);
 });
 
 test("target files follow install.sh defaults and overrides", () => {

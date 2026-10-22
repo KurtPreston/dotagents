@@ -6,15 +6,18 @@ import type { JsonObject } from "../lib/json.ts";
 import type { Server } from "./targets.ts";
 
 const NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
-const ALLOWED_KEYS = new Set(["command", "args", "env"]);
+const ALLOWED_KEYS = new Set(["command", "args", "env", "load", "tools"]);
+const LOAD_MODES = new Set(["static", "on-demand"]);
 
-type Declaration = Pick<Server, "command" | "args" | "env">;
+type Declaration = Pick<Server, "command" | "args" | "env" | "onDemand" | "tools">;
 
 // Check a parsed declaration's shape, returning it with defaults filled in
 function validate(value: JsonObject, label: string): Declaration {
   for (const key of Object.keys(value)) {
     if (!ALLOWED_KEYS.has(key)) {
-      throw new InstallError(`${label}: unsupported key "${key}" (expected command, args, env)`);
+      throw new InstallError(
+        `${label}: unsupported key "${key}" (expected command, args, env, load, tools)`,
+      );
     }
   }
   if (typeof value.command !== "string" || value.command === "") {
@@ -35,7 +38,30 @@ function validate(value: JsonObject, label: string): Declaration {
   ) {
     throw new InstallError(`${label}: "env" must be an object of strings`);
   }
-  return { command: value.command, args, env: env as Record<string, string> };
+
+  // load picks static (default) or on-demand; tools optionally allowlists tool names
+  const load = value.load ?? "static";
+  if (typeof load !== "string" || !LOAD_MODES.has(load)) {
+    throw new InstallError(`${label}: "load" must be "static" or "on-demand"`);
+  }
+  const tools = value.tools;
+  if (
+    tools !== undefined &&
+    (!Array.isArray(tools) ||
+      tools.length === 0 ||
+      !tools.every((tool) => typeof tool === "string"))
+  ) {
+    throw new InstallError(`${label}: "tools" must be a non-empty array of strings`);
+  }
+
+  // Optional fields appear only when set, so plain declarations stay plain
+  return {
+    command: value.command,
+    args,
+    env: env as Record<string, string>,
+    ...(load === "on-demand" ? { onDemand: true } : {}),
+    ...(tools !== undefined ? { tools: tools as string[] } : {}),
+  };
 }
 
 // Read every plugin's mcp/*.json in plugin order, failing on bad files or duplicate names
