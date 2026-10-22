@@ -17,3 +17,4 @@ Read this before changing dotagents. Each entry says what to do and why.
 ## Plugins
 
 - An MCP server declaration names the program to run, such as `npx`, not where it's installed. The installer resolves it on `PATH`, so switching version managers needs only a reinstall.
+- Keep static context small. Only MCP servers used in most sessions should be `"load": "static"`; make the rest on-demand, with a skill that says when to use them and calls them through `mcp-call`. Rules should say when to reach for a tool, not restate its tool list.

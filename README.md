@@ -162,12 +162,27 @@ A plugin declares each MCP server in its own `mcp/<name>.json`, once for every a
 }
 ```
 
-- `command` is required. `args`, a list of strings, and `env`, an object of strings, are optional. Any other key, such as `url`, is rejected, so only servers an agent launches as a local process are supported. That process may itself connect to a hosted server, as `mcp-remote` does.
+- `command` is required. `args`, a list of strings, and `env`, an object of strings, are optional, as are `load` and `tools`, described below. Any other key, such as `url`, is rejected, so only servers an agent launches as a local process are supported. That process may itself connect to a hosted server, as `mcp-remote` does.
 - `command` should name a program, not where it's installed. A bare name such as `npx` is looked up on the `PATH` of the shell running `./install.sh`, and agents get the absolute path, since GUI apps may not inherit your shell's `PATH`. After switching version managers, rerun the installer to update every server. A bare name that isn't on `PATH` fails the install before anything changes, so run the installer from a terminal that has every command.
 - `command` may instead be an absolute path, or start with `~/`, for programs that aren't on `PATH`.
 - Don't put secrets in declarations. Use servers that sign in on their own, such as through OAuth.
+- `load` is `"static"` (the default) or `"on-demand"`. Static servers are installed into every agent, so their tool definitions sit in each session's context. On-demand servers aren't installed at all; agents call them through `mcp-call` instead, described below.
+- `tools`, an optional list of tool names, limits which tools agents that support it expose. Copilot gets the list as its `tools`, or `["*"]` when it's omitted. Use it to drop tools a static server shouldn't offer, such as write tools.
 
-Each selected agent gets the server in its own shape, in the file shown in the [Install](#install) table. Copilot entries add `"type": "stdio"` and `"tools": ["*"]`, and Claude Code entries add `"type": "stdio"`.
+Each selected agent gets the server in its own shape, in the file shown in the [Install](#install) table. Copilot entries add `"type": "stdio"` and `"tools"`, and Claude Code entries add `"type": "stdio"`.
+
+### On-demand servers
+
+Every tool definition a static server exposes costs context in every session, whether or not it's used. Keep servers you use often static, and make the rest on-demand. Pair each on-demand server with a short skill whose description says when to reach for it, so agents know it exists without loading its tools.
+
+Agents call on-demand servers with `~/.agents/bin/mcp-call`, which starts the declared server, runs one request, and exits:
+
+```sh
+mcp-call                                 # list declared servers
+mcp-call SERVER --list                   # list a server's tools
+mcp-call SERVER --schema TOOL            # print a tool's input schema
+mcp-call SERVER TOOL '{"arg": "value"}'  # call a tool and print its result
+```
 
 ### Ownership
 
