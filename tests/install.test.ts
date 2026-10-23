@@ -531,16 +531,15 @@ test("installer", { skip }, async (t) => {
     addRule(f, "zeta/a.md", "## Zeta A\n");
     addRule(f, "alpha/b.md", "## Alpha B\n");
     addRule(f, "alpha/a.md", "## Alpha A\n");
-    addRule(f, "alpha/introduction.md", "# Alpha\n");
+    addRule(f, "alpha/_introduction.md", "# Alpha\n");
     addRule(f, "alpha/notes.txt", "Ignored.\n");
     fs.mkdirSync(path.join(f.plugins, "empty"));
     install(f, ["zed"]);
     const defaults = fs
       .readdirSync(path.join(f.defaults, "rules"))
       .filter((name) => name.endsWith(".md"))
-      .sort()
-      .sort((a, b) => Number(b === "introduction.md") - Number(a === "introduction.md"));
-    assert.equal(defaults[0], "introduction.md");
+      .sort();
+    assert.equal(defaults[0], "_introduction.md");
     const parts = defaults.map((name) =>
       fs.readFileSync(path.join(f.defaults, "rules", name), "utf8"),
     );
