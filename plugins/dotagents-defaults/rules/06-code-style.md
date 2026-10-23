@@ -14,6 +14,34 @@ Keep each source file to one responsibility, small enough to read whole. Aim for
 - Keep functions short for the same reason. One over about 100 lines usually hides steps that deserve names.
 - Make a split a pure move, with no behavior change in the same commit, so a reviewer can check it mechanically.
 
+### Function Parameters
+
+A function should take at most three parameters. When it needs more, have it take one object with named keys instead. Callers then name each argument, so they can't mix up the order, and adding an option later doesn't change every call.
+
+```typescript
+// Prefer
+function createUser({ email, role, team, invitedBy }: CreateUserOptions) {}
+createUser({ email, role: 'admin', team, invitedBy: admin.id })
+
+// Avoid
+function createUser(email: string, role: Role, team: Team, invitedBy: string) {}
+```
+
+### Braces
+
+Always use braces around the body of `if`, `else`, `for`, `while`, and `do`, even when it's a single statement. A line added later then can't silently fall outside the block, and every control statement reads the same way.
+
+### Lint Rules
+
+When setting up ESLint or oxlint in a JavaScript or TypeScript project of mine, enforce both of the above:
+
+```json
+"rules": {
+  "curly": ["error", "all"],
+  "max-params": ["error", 3]
+}
+```
+
 ### Section Comments
 
 When writing or editing code, add brief comments every 3–10 lines. Each comment should be succinct guiding text that describes what the lines below it are doing.
