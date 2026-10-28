@@ -172,6 +172,26 @@ test("creates missing configs owner-only with each target's shape", (t) => {
   });
 });
 
+test("edits Codex's TOML config, keeping comments, then replaces and prunes", (t) => {
+  const { env, run } = fixture(t);
+  const file = path.join(env.CODEX_HOME, "config.toml");
+  write(file, '# Codex settings\nmodel = "gpt-5"\n');
+  run([server("linear"), { ...server("slack"), tools: ["read"] }], ["codex"]);
+  assert.equal(
+    fs.readFileSync(file, "utf8"),
+    '# Codex settings\nmodel = "gpt-5"\n\n[mcp_servers.linear]\ncommand = "/bin/linear"\nargs = ["--x"]\n' +
+      '\n[mcp_servers.slack]\ncommand = "/bin/slack"\nargs = ["--x"]\nenabled_tools = ["read"]\n',
+  );
+
+  // A rerun with one server changed and one dropped edits only those tables
+  run([server("linear", "/new/linear")], ["codex"]);
+  assert.equal(
+    fs.readFileSync(file, "utf8"),
+    '# Codex settings\nmodel = "gpt-5"\n\n[mcp_servers.linear]\ncommand = "/new/linear"\nargs = ["--x"]\n',
+  );
+  assert.deepEqual(read(path.join(env.AGENTS_HOME, "state", "mcp.json")), { codex: ["linear"] });
+});
+
 test("keeps other keys in Claude's app state file and its permissions", (t) => {
   const { env, run } = fixture(t);
   const file = path.join(env.HOME, ".claude.json");

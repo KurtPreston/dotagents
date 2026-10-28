@@ -1,5 +1,5 @@
 // Install dotagents into each selected agent: instructions, skills, scripts, settings, and MCP servers.
-// Usage: node scripts/install.ts [--runner] [--add GIT_URL [--name NAME] [--ref REF]] [cursor] [zed] [claude] [copilot]
+// Usage: node scripts/install.ts [--runner] [--add GIT_URL [--name NAME] [--ref REF]] [cursor] [zed] [claude] [copilot] [codex]
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +20,7 @@ const HOME_NAMES = [
   "ZED_HOME",
   "CLAUDE_HOME",
   "COPILOT_HOME",
+  "CODEX_HOME",
   "AGENTS_HOME",
 ] as const;
 type Homes = Record<(typeof HOME_NAMES)[number] | "HOME", string>;
@@ -63,6 +64,7 @@ function resolveHomes(env: NodeJS.ProcessEnv, runner: boolean): Homes {
     ZED_HOME: env.ZED_HOME || path.join(home, ".config", "zed"),
     CLAUDE_HOME: env.CLAUDE_HOME || path.join(home, ".claude"),
     COPILOT_HOME: env.COPILOT_HOME || path.join(home, ".copilot"),
+    CODEX_HOME: env.CODEX_HOME || path.join(home, ".codex"),
     AGENTS_HOME: env.AGENTS_HOME || path.join(home, ".agents"),
   };
 }
@@ -282,9 +284,12 @@ function main(argv: string[]): void {
     ...(has("copilot") && {
       copilot: { source: agents, target: path.join(homes.COPILOT_HOME, "copilot-instructions.md") },
     }),
+    ...(has("codex") && {
+      codex: { source: agents, target: path.join(homes.CODEX_HOME, "AGENTS.md") },
+    }),
   };
   const skillDirs = [
-    ...(["cursor", "zed", "copilot"].some((target) => has(target as Target))
+    ...(["cursor", "zed", "copilot", "codex"].some((target) => has(target as Target))
       ? [path.join(homes.AGENTS_HOME, "skills")]
       : []),
     ...(has("claude") ? [path.join(homes.CLAUDE_HOME, "skills")] : []),

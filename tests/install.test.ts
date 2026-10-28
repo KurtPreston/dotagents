@@ -26,7 +26,7 @@ test("installer", { skip }, async (t) => {
   await t.test("default installs all integrations", (t) => {
     const f = fixture(t);
     install(f);
-    assertInstalled(f, ["cursor", "zed", "claude", "copilot"]);
+    assertInstalled(f, ["cursor", "zed", "claude", "copilot", "codex"]);
     assert.deepEqual(backupsOf(f.settings), []);
     assert.deepEqual(backupsOf(f.copilotSettings), []);
   });
@@ -37,8 +37,8 @@ test("installer", { skip }, async (t) => {
     fs.rmSync(path.join(f.bin, "cursor"));
     fs.rmSync(path.join(f.bin, "zed"));
     const result = install(f);
-    assertInstalled(f, ["claude", "copilot"]);
-    assert.match(result.stdout, /installing for claude, copilot \(not found: cursor, zed\)/);
+    assertInstalled(f, ["claude", "copilot", "codex"]);
+    assert.match(result.stdout, /installing for claude, copilot, codex \(not found: cursor, zed\)/);
   });
 
   await t.test("default detects agents from app bundles", (t) => {
@@ -99,6 +99,7 @@ test("installer", { skip }, async (t) => {
     assert.deepEqual(Object.keys(exported).sort(), [
       "AGENTS_HOME",
       "CLAUDE_HOME",
+      "CODEX_HOME",
       "COPILOT_HOME",
       "CURSOR_HOME",
       "ZED_HOME",
@@ -349,6 +350,7 @@ test("installer", { skip }, async (t) => {
       ["zed", path.join(f.homes.ZED_HOME, "AGENTS.md")],
       ["claude", path.join(f.homes.CLAUDE_HOME, "CLAUDE.md")],
       ["copilot", path.join(f.homes.COPILOT_HOME, "copilot-instructions.md")],
+      ["codex", path.join(f.homes.CODEX_HOME, "AGENTS.md")],
     ];
     for (const [target, file] of files) {
       fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -445,7 +447,7 @@ test("installer", { skip }, async (t) => {
     const alpha = addSkill(f, "alpha/alpha-skill");
     const zeta = addSkill(f, "zeta/zeta-skill");
     install(f);
-    assertInstalled(f, ["cursor", "zed", "claude", "copilot"]);
+    assertInstalled(f, ["cursor", "zed", "claude", "copilot", "codex"]);
     for (const home of ["AGENTS_HOME", "CLAUDE_HOME"] as const) {
       assertLink(path.join(f.homes[home], "skills", "alpha-skill"), alpha);
       assertLink(path.join(f.homes[home], "skills", "zeta-skill"), zeta);
@@ -507,7 +509,7 @@ test("installer", { skip }, async (t) => {
     const binDir = path.join(f.homes.AGENTS_HOME, "bin");
     assert.ok(!fs.lstatSync(path.join(binDir, path.basename(script)), { throwIfNoEntry: false }));
     assert.ok(fs.lstatSync(foreign).isSymbolicLink());
-    assertInstalled(f, ["cursor", "zed", "claude", "copilot"]);
+    assertInstalled(f, ["cursor", "zed", "claude", "copilot", "codex"]);
   });
 
   await t.test("user-managed scripts fail the install before any change", (t) => {

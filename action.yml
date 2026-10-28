@@ -3,7 +3,7 @@ description: Install dotagents' standing instructions, skills and settings on a 
 
 inputs:
   targets:
-    description: Space-separated install.sh targets (cursor, zed, claude, copilot).
+    description: Space-separated install.sh targets (cursor, zed, claude, copilot, codex).
     default: copilot
   config:
     description: Path to a dotagents.jsonc listing the remote plugins to install, relative to the workspace.

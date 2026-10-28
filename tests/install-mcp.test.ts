@@ -4,6 +4,7 @@ import type { TestContext } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { parse } from "smol-toml";
 import {
   assertPreflightFailure,
   fixture,
@@ -23,6 +24,7 @@ function mcpFixture(t: TestContext) {
     copilot: [path.join(f.homes.COPILOT_HOME, "mcp-config.json"), "mcpServers"],
     claude: [path.join(f.homes.HOME, ".claude.json"), "mcpServers"],
     cursor: [path.join(f.homes.CURSOR_HOME, "mcp.json"), "mcpServers"],
+    codex: [path.join(f.homes.CODEX_HOME, "config.toml"), "mcp_servers"],
   };
 
   // Declare a server as "plugin/name", and read a target's installed servers
@@ -34,7 +36,8 @@ function mcpFixture(t: TestContext) {
   };
   const servers = (target: string): Record<string, Record<string, unknown>> => {
     const [file = "", key = ""] = configs[target] ?? [];
-    return (readJson(file) as Record<string, Record<string, Record<string, unknown>>>)[key] ?? {};
+    const value = file.endsWith(".toml") ? parse(fs.readFileSync(file, "utf8")) : readJson(file);
+    return (value as Record<string, Record<string, Record<string, unknown>>>)[key] ?? {};
   };
   return { ...f, f, tool, configs, addMcp, servers };
 }

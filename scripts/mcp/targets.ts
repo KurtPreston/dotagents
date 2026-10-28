@@ -20,17 +20,18 @@ export interface Homes {
   ZED_HOME: string;
   COPILOT_HOME: string;
   CURSOR_HOME: string;
+  CODEX_HOME: string;
   AGENTS_HOME: string;
 }
 
 export interface Target {
   file: (homes: Homes) => string;
   key: string;
-  jsonc: boolean;
+  format: "json" | "jsonc" | "toml";
   render: (server: Server) => Record<string, unknown>;
 }
 
-export type TargetName = "zed" | "copilot" | "claude" | "cursor";
+export type TargetName = "zed" | "copilot" | "claude" | "cursor" | "codex";
 
 // Render the common {command, args, env} entry most agents use
 const plain = ({ command, args, env }: Server) => ({ command, args, env });
@@ -40,14 +41,14 @@ export const TARGETS: Record<TargetName, Target> = {
     // Zed's settings are JSONC and hold everything else Zed is configured with
     file: (homes) => path.join(homes.ZED_HOME, "settings.json"),
     key: "context_servers",
-    jsonc: true,
+    format: "jsonc",
     render: plain,
   },
   copilot: {
     // Copilot CLI wants an explicit transport type and a tool allowlist
     file: (homes) => path.join(homes.COPILOT_HOME, "mcp-config.json"),
     key: "mcpServers",
-    jsonc: false,
+    format: "json",
     render: ({ command, args, env, tools }) => ({
       type: "stdio",
       command,
@@ -60,14 +61,26 @@ export const TARGETS: Record<TargetName, Target> = {
     // Claude Code keeps user-scope servers in ~/.claude.json, not under ~/.claude/
     file: (homes) => path.join(homes.HOME, ".claude.json"),
     key: "mcpServers",
-    jsonc: false,
+    format: "json",
     render: ({ command, args, env }) => ({ type: "stdio", command, args, env }),
   },
   cursor: {
     file: (homes) => path.join(homes.CURSOR_HOME, "mcp.json"),
     key: "mcpServers",
-    jsonc: false,
+    format: "json",
     render: plain,
+  },
+  codex: {
+    // Codex keeps servers as [mcp_servers.<name>] tables in its TOML config
+    file: (homes) => path.join(homes.CODEX_HOME, "config.toml"),
+    key: "mcp_servers",
+    format: "toml",
+    render: ({ command, args, env, tools }) => ({
+      command,
+      args,
+      ...(Object.keys(env).length > 0 ? { env } : {}),
+      ...(tools ? { enabled_tools: tools } : {}),
+    }),
   },
 };
 
@@ -83,6 +96,7 @@ export function targetEnv(env: NodeJS.ProcessEnv): Homes {
     ZED_HOME: env.ZED_HOME || path.join(home, ".config", "zed"),
     COPILOT_HOME: env.COPILOT_HOME || path.join(home, ".copilot"),
     CURSOR_HOME: env.CURSOR_HOME || path.join(home, ".cursor"),
+    CODEX_HOME: env.CODEX_HOME || path.join(home, ".codex"),
     AGENTS_HOME: env.AGENTS_HOME || path.join(home, ".agents"),
   };
 }

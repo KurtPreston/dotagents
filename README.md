@@ -1,6 +1,6 @@
 # dotagents
 
-An installer for agent plugins. It gives Cursor, Zed, Claude Code, and GitHub Copilot one set of standing instructions, skills, scripts, MCP servers, and selected app settings, gathered from plugins that can each live in their own repository.
+An installer for agent plugins. It gives Cursor, Zed, Claude Code, GitHub Copilot, and Codex one set of standing instructions, skills, scripts, MCP servers, and selected app settings, gathered from plugins that can each live in their own repository.
 
 ## Quick start
 
@@ -23,7 +23,7 @@ To hand teammates a ready-made setup, share a `dotagents.jsonc` listing your tea
 - `scripts/agents.ts` — the supported agents, and which are installed on this machine.
 - `scripts/plugins/` — reads `dotagents.jsonc` and clones or fast-forwards the plugins it lists.
 - `scripts/settings.ts` — merges plugins' settings overlays and applies them with minimal edits, safe writes, and backups.
-- `scripts/mcp/` — applies plugin MCP servers to each agent's config. See [MCP servers](#mcp-servers).
+- `scripts/mcp/` — applies plugin MCP servers to each agent's JSON or TOML config. See [MCP servers](#mcp-servers).
 - `scripts/lib/` — plugin discovery, `PATH` lookup, JSON parsing, file snapshots and atomic replacement, and minimal JSON edits.
 - `bin/mcp-call` — calls on-demand MCP servers. See [On-demand servers](#on-demand-servers).
 - `tests/` — unit and installer tests using temporary configuration directories.
@@ -88,6 +88,7 @@ With no agents named, the installer configures each agent it finds installed and
 | Zed            | `zed`, `zeditor`                   | `Zed.app`                             |
 | Claude Code    | `claude`                           | `Claude.app`                          |
 | GitHub Copilot | `copilot`, `code`, `code-insiders` | `Visual Studio Code.app` and Insiders |
+| Codex          | `codex`                            | `Codex.app`                           |
 
 Configuration folders such as `~/.cursor` don't count, since an earlier install may have created them. Skipping an agent leaves anything already installed for it in place.
 
@@ -95,7 +96,7 @@ Name agents to install exactly those, whether or not they're detected:
 
 ```sh
 ./install.sh cursor zed
-./install.sh claude copilot
+./install.sh claude copilot codex
 ```
 
 The installer configures:
@@ -106,8 +107,9 @@ The installer configures:
 | Zed            | `~/.config/zed/AGENTS.md` symlink            | Linked individually into `~/.agents/skills/` | `context_servers` in `~/.config/zed/settings.json` |
 | Claude Code    | `~/.claude/CLAUDE.md` symlink                | Linked individually into `~/.claude/skills/` | `~/.claude.json`                                   |
 | GitHub Copilot | `~/.copilot/copilot-instructions.md` symlink | Linked individually into `~/.agents/skills/` | `~/.copilot/mcp-config.json`                       |
+| Codex          | `~/.codex/AGENTS.md` symlink                 | Linked individually into `~/.agents/skills/` | `mcp_servers` in `~/.codex/config.toml`            |
 
-Every run first regenerates `AGENTS.md`, starting it with a marker comment. The installer refuses to replace an `AGENTS.md` without that marker, so move hand-written instructions into a plugin's `rules/` before installing. Cursor requires `.mdc` frontmatter, so its adapter is also regenerated from `AGENTS.md`. Zed, Claude Code, and Copilot use the generated file directly through symlinks. The Copilot integration covers Copilot CLI and the Copilot agent in VS Code, which share `~/.copilot`.
+Every run first regenerates `AGENTS.md`, starting it with a marker comment. The installer refuses to replace an `AGENTS.md` without that marker, so move hand-written instructions into a plugin's `rules/` before installing. Cursor requires `.mdc` frontmatter, so its adapter is also regenerated from `AGENTS.md`. Zed, Claude Code, Copilot, and Codex use the generated file directly through symlinks. The Copilot integration covers Copilot CLI and the Copilot agent in VS Code, which share `~/.copilot`. The Codex integration covers Codex CLI, its IDE extension, and its desktop app, which share `~/.codex`.
 
 Existing user-managed instruction files, skill folders, and scripts are never overwritten. The installer checks for all of them, along with settings and MCP conflicts, before changing anything. Skills are linked one directory at a time so unrelated skills can coexist in each destination.
 
@@ -115,7 +117,7 @@ Existing user-managed instruction files, skill folders, and scripts are never ov
 
 Set `DOTAGENTS_APP_DIRS` to a `:`-separated list of folders to search for apps instead of the macOS defaults, or to an empty string to detect agents by command alone.
 
-Override an agent's configuration directory with `CURSOR_HOME`, `ZED_HOME`, `CLAUDE_HOME`, `COPILOT_HOME`, or `AGENTS_HOME`:
+Override an agent's configuration directory with `CURSOR_HOME`, `ZED_HOME`, `CLAUDE_HOME`, `COPILOT_HOME`, `CODEX_HOME`, or `AGENTS_HOME`:
 
 ```sh
 ZED_HOME="$HOME/custom-zed" ./install.sh zed
@@ -130,7 +132,7 @@ This repository is also a GitHub or Gitea Actions action. It installs dotagents 
 ```yaml
 - uses: https://github.com/KurtPreston/dotagents@main
   with:
-    targets: copilot # the default; any of cursor, zed, claude, copilot
+    targets: copilot # the default; any of cursor, zed, claude, copilot, codex
     config: .github/dotagents.jsonc # optional: remote plugins to install
     token: ${{ secrets.PLUGINS_TOKEN }} # optional: read access to private plugin repositories
 ```
@@ -161,7 +163,7 @@ Overlays from several plugins merge in plugin order. Two plugins may set differe
 - A missing destination is created. Existing empty files, malformed JSON, duplicate keys, nonstandard or out-of-range numbers, invalid UTF-8, non-object roots, and symlink destinations (including dangling links) are rejected.
 - Settings are validated as JSON, not against the application's settings schema. Keep app-specific values compatible with the versions you use. Do not commit secrets in overlays.
 
-Claude and Copilot settings use strict JSON; Zed settings allow comments and trailing commas (JSONC). Cursor and VS Code app settings are untouched. If you add comments to Copilot's `settings.json`, the installer rejects the file instead of discarding them. The MCP sync also edits `context_servers` in Zed's `settings.json` and keeps its comments.
+Claude and Copilot settings use strict JSON; Zed settings allow comments and trailing commas (JSONC). Cursor, VS Code, and Codex app settings are untouched; Codex has no overlay, since its settings are TOML. If you add comments to Copilot's `settings.json`, the installer rejects the file instead of discarding them. The MCP sync also edits `context_servers` in Zed's `settings.json` and keeps its comments.
 
 `scripts/install.ts` maps each overlay to its destination explicitly. Overlays never contain destination paths, and destinations are not inferred from overlay filenames. A future integration should confirm the app's real settings path rather than assume it sits beside the app's instructions directory.
 
@@ -192,9 +194,9 @@ A plugin declares each MCP server in its own `mcp/<name>.json`, once for every a
 - `command` may instead be an absolute path, or start with `~/`, for programs that aren't on `PATH`.
 - Don't put secrets in declarations. Use servers that sign in on their own, such as through OAuth.
 - `load` is `"static"` (the default) or `"on-demand"`. Static servers are installed into every agent, so their tool definitions sit in each session's context. On-demand servers aren't installed at all; agents call them through `mcp-call` instead, described below.
-- `tools`, an optional list of tool names, limits which tools agents that support it expose. Copilot gets the list as its `tools`, or `["*"]` when it's omitted. Use it to drop tools a static server shouldn't offer, such as write tools.
+- `tools`, an optional list of tool names, limits which tools agents that support it expose. Copilot gets the list as its `tools`, or `["*"]` when it's omitted, and Codex as its `enabled_tools`. Use it to drop tools a static server shouldn't offer, such as write tools.
 
-Each selected agent gets the server in its own shape, in the file shown in the [Install](#install) table. Copilot entries add `"type": "stdio"` and `"tools"`, and Claude Code entries add `"type": "stdio"`.
+Each selected agent gets the server in its own shape, in the file shown in the [Install](#install) table. Copilot entries add `"type": "stdio"` and `"tools"`, and Claude Code entries add `"type": "stdio"`. Codex gets each server as a `[mcp_servers.<name>]` table, with `tools` as its `enabled_tools`.
 
 ### On-demand servers
 
@@ -227,6 +229,7 @@ The sync follows the same safety rules as [app settings](#backups-and-recovery):
 - A changed file gets an owner-only `<file>.<random>.bak` backup and is replaced atomically, keeping its permissions. New files are created owner-only.
 - An unchanged file isn't rewritten.
 - Malformed files, duplicate keys, and symlinked destinations are rejected.
+- In Codex's `config.toml`, a server's `[mcp_servers.<name>]` table and its subtables are replaced whole, and the result is parsed again to check nothing else changed. A server written another way, such as with dotted keys, fails the install; rewrite it as a table or remove it.
 
 Claude Code rewrites `~/.claude.json` while it runs, so install with Claude Code closed. The sync refuses to replace a file that changed after it was read, but it can't lock out other writers.
 
