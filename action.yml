@@ -1,0 +1,25 @@
+name: dotagents
+description: Install dotagents' standing instructions, skills and settings on a runner, for the agents later steps run.
+
+inputs:
+  targets:
+    description: Space-separated install.sh targets (cursor, zed, claude, copilot).
+    default: copilot
+  config:
+    description: Path to a dotagents.jsonc listing the remote plugins to install, relative to the workspace.
+    default: ""
+  token:
+    description: Token git uses to clone plugin repositories from this server, such as private ones. SSH URLs for this server are cloned over HTTPS.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # Install into temporary homes, and export them for later steps
+    - name: Install dotagents
+      shell: bash
+      env:
+        TARGETS: ${{ inputs.targets }}
+        CONFIG: ${{ inputs.config }}
+        TOKEN: ${{ inputs.token }}
+      run: '"$GITHUB_ACTION_PATH/scripts/action.sh"'

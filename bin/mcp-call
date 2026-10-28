@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Call a tool on a declared MCP server without loading it into the agent's context.
+# Usage: mcp-call SERVER --list | --schema TOOL | TOOL [JSON_ARGS]
+set -euo pipefail
+
+# Resolve the real script location through the ~/.agents/bin symlink
+source="${BASH_SOURCE[0]}"
+while [ -L "$source" ]; do
+  dir="$(cd -P "$(dirname "$source")" && pwd)"
+  source="$(readlink "$source")"
+  [[ "$source" != /* ]] && source="$dir/$source"
+done
+root="$(cd -P "$(dirname "$source")/.." && pwd)"
+
+# Hand off to the TypeScript CLI in the dotagents checkout
+exec node "$root/scripts/mcp/call.ts" "$@"

@@ -1,0 +1,12 @@
+// Remote plugins dotagents keeps in sync. Copy this file to dotagents.jsonc, or run
+// ./install.sh --add GIT_URL [--name NAME] [--ref REF] to create it and add an entry.
+//
+// Each install clones missing plugins into plugins/<name> and fast-forwards existing ones
+// to "ref" (a branch or tag; the remote's default branch when omitted). Checkouts with
+// uncommitted changes or local commits are left alone. Folders in plugins/ that aren't
+// listed here still install as local-only plugins.
+{
+  "plugins": [
+    // { "name": "team", "git": "git@github.com:example/team-agents.git", "ref": "main" }
+  ],
+}
