@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  AGENT_COMMANDS,
   BASH,
   EXPECTED_COPILOT_SETTINGS,
   EXPECTED_SETTINGS,
@@ -28,6 +29,33 @@ test("installer", { skip }, async (t) => {
     assertInstalled(f, ["cursor", "zed", "claude", "copilot"]);
     assert.deepEqual(backupsOf(f.settings), []);
     assert.deepEqual(backupsOf(f.copilotSettings), []);
+  });
+
+  await t.test("default skips agents that aren't installed", (t) => {
+    // Only claude and copilot are on PATH, so cursor and zed homes stay absent
+    const f = fixture(t);
+    fs.rmSync(path.join(f.bin, "cursor"));
+    fs.rmSync(path.join(f.bin, "zed"));
+    const result = install(f);
+    assertInstalled(f, ["claude", "copilot"]);
+    assert.match(result.stdout, /installing for claude, copilot \(not found: cursor, zed\)/);
+  });
+
+  await t.test("default detects agents from app bundles", (t) => {
+    const f = fixture(t);
+    AGENT_COMMANDS.forEach((agent) => fs.rmSync(path.join(f.bin, agent)));
+    fs.mkdirSync(path.join(f.apps, "Zed.app"));
+    install(f);
+    assertInstalled(f, ["zed"]);
+  });
+
+  await t.test("default fails when no agent is installed, but named ones still install", (t) => {
+    const f = fixture(t);
+    AGENT_COMMANDS.forEach((agent) => fs.rmSync(path.join(f.bin, agent)));
+    const result = assertPreflightFailure(f);
+    assert.match(result.stderr, /name the agents to install/);
+    install(f, ["cursor"]);
+    assertInstalled(f, ["cursor"]);
   });
 
   await t.test("claude only installs instructions, skills, and settings", (t) => {

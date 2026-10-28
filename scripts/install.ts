@@ -3,7 +3,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { TARGET_NAMES, appDirs, detectAgents } from "./agents.ts";
+import type { Target } from "./agents.ts";
 import { InstallError } from "./lib/json.ts";
+import { isExecutableFile } from "./lib/path.ts";
 import { findPlugins, isDirectory, list } from "./lib/plugins.ts";
 import { loadServers } from "./mcp/declarations.ts";
 import { addPlugin, readConfig } from "./plugins/config.ts";
@@ -12,8 +15,6 @@ import { sync } from "./mcp/sync.ts";
 import { applySettings } from "./settings.ts";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const TARGET_NAMES = ["cursor", "zed", "claude", "copilot"] as const;
-type Target = (typeof TARGET_NAMES)[number];
 const HOME_NAMES = [
   "CURSOR_HOME",
   "ZED_HOME",
@@ -105,17 +106,33 @@ function parseOptions(argv: string[]): Options {
   return options;
 }
 
-// Check every target name before doing anything; no names means every agent
+// Check every target name before doing anything. Named targets install even when not
+// detected; with none named, a runner gets Copilot and anywhere else every installed agent.
 function parseTargets(args: string[], runner: boolean): Target[] {
   for (const arg of args) {
     if (!(TARGET_NAMES as readonly string[]).includes(arg)) {
-      throw new InstallError(`unknown target '${arg}' (expected cursor, zed, claude, or copilot)`);
+      throw new InstallError(`unknown target '${arg}' (expected ${TARGET_NAMES.join(", ")})`);
     }
   }
-  if (args.length === 0) {
-    return runner ? ["copilot"] : [...TARGET_NAMES];
+  if (args.length > 0) {
+    return args as Target[];
   }
-  return args as Target[];
+  if (runner) {
+    return ["copilot"];
+  }
+
+  // Detect installed agents and say which were skipped
+  const found = detectAgents({ searchPath: process.env.PATH, apps: appDirs(process.env) });
+  if (found.length === 0) {
+    throw new InstallError(
+      `found none of ${TARGET_NAMES.join(", ")} on PATH or in Applications — name the agents to install`,
+    );
+  }
+  const missing = TARGET_NAMES.filter((target) => !found.includes(target));
+  console.log(
+    `installing for ${found.join(", ")}${missing.length > 0 ? ` (not found: ${missing.join(", ")})` : ""}`,
+  );
+  return found;
 }
 
 // Collect one kind of plugin content by name, failing on a name two plugins share
@@ -137,16 +154,6 @@ function collect(
     }
   }
   return found;
-}
-
-// True when a path is a regular file this process may execute
-function isExecutable(file: string): boolean {
-  try {
-    fs.accessSync(file, fs.constants.X_OK);
-    return fs.statSync(file).isFile();
-  } catch {
-    return false;
-  }
 }
 
 // Every plugin's rules in load order, each plugin's in filename order. Rules whose names
@@ -225,7 +232,7 @@ function main(argv: string[]): void {
   // Find plugin content, failing on names two plugins share
   const plugins = findPlugins(REPO_ROOT);
   const skills = collect(plugins, { kind: "skill", accept: isDirectory });
-  const scripts = collect(plugins, { kind: "script", accept: isExecutable });
+  const scripts = collect(plugins, { kind: "script", accept: isExecutableFile });
   for (const name of list(path.join(REPO_ROOT, "bin"))) {
     if (scripts.has(name)) {
       throw new InstallError(

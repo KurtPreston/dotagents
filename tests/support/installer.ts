@@ -26,6 +26,7 @@ export const HOME_NAMES = [
   "AGENTS_HOME",
 ] as const;
 export type HomeName = (typeof HOME_NAMES)[number];
+export const AGENT_COMMANDS = ["cursor", "zed", "claude", "copilot"] as const;
 
 // Find a command on this process's PATH, as a shell would
 export function which(command: string): string | undefined {
@@ -104,7 +105,13 @@ export function fixture(t: TestContext) {
     assert.ok(executable, `required utility: ${command}`);
     fs.symlinkSync(executable, path.join(bin, command));
   }
-  const env: Record<string, string> = { ...homes, PATH: bin };
+  // Stub agent commands so defaults detect every agent; app bundles come from an empty folder
+  for (const agent of AGENT_COMMANDS) {
+    fs.writeFileSync(path.join(bin, agent), "#!/bin/sh\n", { mode: 0o755 });
+  }
+  const apps = path.join(root, "applications");
+  fs.mkdirSync(apps);
+  const env: Record<string, string> = { ...homes, PATH: bin, DOTAGENTS_APP_DIRS: apps };
 
   const f = {
     root,
@@ -113,6 +120,7 @@ export function fixture(t: TestContext) {
     defaults,
     homes,
     bin,
+    apps,
     env,
     agents: path.join(repo, "AGENTS.md"),
     settings: path.join(homes.CLAUDE_HOME, "settings.json"),
