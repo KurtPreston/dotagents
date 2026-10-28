@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { InstallError, parseDocument } from "../lib/json.ts";
 import type { JsonObject } from "../lib/json.ts";
+import { findOnPath, isExecutableFile } from "../lib/path.ts";
 import type { Server } from "./targets.ts";
 
 const NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
@@ -103,16 +104,6 @@ export function loadDeclarations(pluginDirs: string[]): Server[] {
   return servers;
 }
 
-// True when a path is a regular file this process may execute
-function isExecutableFile(candidate: string): boolean {
-  try {
-    fs.accessSync(candidate, fs.constants.X_OK);
-    return fs.statSync(candidate).isFile();
-  } catch {
-    return false;
-  }
-}
-
 interface ResolveOptions {
   home: string;
   searchPath: string | undefined;
@@ -135,8 +126,7 @@ export function resolveCommand(
     );
   } else {
     // Bare names are looked up the way a shell would, first match wins
-    const dirs = (searchPath ?? "").split(path.delimiter).filter((dir) => path.isAbsolute(dir));
-    resolved = dirs.map((dir) => path.join(dir, command)).find(isExecutableFile);
+    resolved = findOnPath(command, searchPath);
     if (resolved === undefined) {
       throw new InstallError(
         `${label}: command "${command}" was not found on PATH — run ./install.sh from a shell where it is`,
