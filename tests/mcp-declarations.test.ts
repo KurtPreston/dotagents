@@ -182,6 +182,13 @@ test("renders each target's entry shape", () => {
   });
   assert.deepEqual(render("copilot", { ...server, env: { A: "1" } }).env, { A: "1" });
   assert.deepEqual(render("copilot", { ...server, tools: ["a"] }).tools, ["a"]);
+  assert.deepEqual(render("codex", server), { command: "/bin/npx", args: ["-y"] });
+  assert.deepEqual(render("codex", { ...server, env: { A: "1" }, tools: ["a"] }), {
+    command: "/bin/npx",
+    args: ["-y"],
+    env: { A: "1" },
+    enabled_tools: ["a"],
+  });
 });
 
 test("target files follow install.sh defaults and overrides", () => {
@@ -190,7 +197,9 @@ test("target files follow install.sh defaults and overrides", () => {
   assert.equal(TARGETS.copilot.file(defaults), "/h/.copilot/mcp-config.json");
   assert.equal(TARGETS.claude.file(defaults), "/h/.claude.json");
   assert.equal(TARGETS.cursor.file(defaults), "/h/.cursor/mcp.json");
+  assert.equal(TARGETS.codex.file(defaults), "/h/.codex/config.toml");
   assert.equal(defaults.AGENTS_HOME, "/h/.agents");
+  assert.equal(TARGETS.codex.file(targetEnv({ HOME: "/h", CODEX_HOME: "/x" })), "/x/config.toml");
 
   const custom = targetEnv({ HOME: "/h", ZED_HOME: "/z", COPILOT_HOME: "/c", CURSOR_HOME: "/u" });
   assert.equal(TARGETS.zed.file(custom), "/z/settings.json");

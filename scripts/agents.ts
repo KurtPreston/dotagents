@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { findOnPath } from "./lib/path.ts";
 
-export const TARGET_NAMES = ["cursor", "zed", "claude", "copilot"] as const;
+export const TARGET_NAMES = ["cursor", "zed", "claude", "copilot", "codex"] as const;
 export type Target = (typeof TARGET_NAMES)[number];
 
 // What shows an agent is installed: a command on PATH, or a macOS app bundle. Config
@@ -18,6 +18,7 @@ const SIGNS: Record<Target, { commands: string[]; apps: string[] }> = {
     commands: ["copilot", "code", "code-insiders"],
     apps: ["Visual Studio Code.app", "Visual Studio Code - Insiders.app"],
   },
+  codex: { commands: ["codex"], apps: ["Codex.app"] },
 };
 
 // Folders holding app bundles: DOTAGENTS_APP_DIRS when set, else the macOS defaults

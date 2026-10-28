@@ -23,10 +23,11 @@ export const HOME_NAMES = [
   "ZED_HOME",
   "CLAUDE_HOME",
   "COPILOT_HOME",
+  "CODEX_HOME",
   "AGENTS_HOME",
 ] as const;
 export type HomeName = (typeof HOME_NAMES)[number];
-export const AGENT_COMMANDS = ["cursor", "zed", "claude", "copilot"] as const;
+export const AGENT_COMMANDS = ["cursor", "zed", "claude", "copilot", "codex"] as const;
 
 // Find a command on this process's PATH, as a shell would
 export function which(command: string): string | undefined {
@@ -223,7 +224,7 @@ export function assertInstalled(f: Fixture, targets: string[]) {
   } else {
     assert.ok(!fs.existsSync(f.homes.ZED_HOME));
   }
-  if (targets.some((target) => ["cursor", "zed", "copilot"].includes(target))) {
+  if (targets.some((target) => ["cursor", "zed", "copilot", "codex"].includes(target))) {
     assertLink(path.join(f.homes.AGENTS_HOME, "skills", "test-skill"), f.skill);
   } else {
     assert.ok(!fs.existsSync(path.join(f.homes.AGENTS_HOME, "skills")));
@@ -248,6 +249,13 @@ export function assertInstalled(f: Fixture, targets: string[]) {
     assert.deepEqual(readJson(f.copilotSettings), EXPECTED_COPILOT_SETTINGS);
   } else {
     assert.ok(!fs.existsSync(f.homes.COPILOT_HOME));
+  }
+
+  // Codex links instructions and shares the open skills folder
+  if (targets.includes("codex")) {
+    assertLink(path.join(f.homes.CODEX_HOME, "AGENTS.md"), f.agents);
+  } else {
+    assert.ok(!fs.existsSync(f.homes.CODEX_HOME));
   }
   assert.ok(!fs.existsSync(f.homes.HOME), "all home overrides must be honored");
 }

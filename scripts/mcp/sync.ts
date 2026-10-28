@@ -4,8 +4,10 @@ import { setProperty } from "../lib/edit.ts";
 import { replaceFile, snapshot } from "../lib/files.ts";
 import type { Snapshot } from "../lib/files.ts";
 import { InstallError, decodeUtf8, isObject, parseDocument } from "../lib/json.ts";
+import type { JsonObject } from "../lib/json.ts";
 import { TARGETS, isTargetName, sameEntry } from "./targets.ts";
-import type { Homes, Server, TargetName } from "./targets.ts";
+import type { Homes, Server, Target, TargetName } from "./targets.ts";
+import { parseToml, setTomlServer } from "./toml.ts";
 
 // Set or remove one server under a top-level key
 export function setServer(text: string, [key, name]: [string, string], value: unknown): string {
@@ -45,12 +47,34 @@ interface PlanInput {
   managed: string[];
 }
 
+// Read a config's servers map, and edit one server, in the target's file format
+function formatOf(target: Target, file: string) {
+  if (target.format === "toml") {
+    return {
+      empty: "",
+      read: (text: string) => parseToml(text, file),
+      set: (text: string, name: string, value: unknown) =>
+        setTomlServer(text, [target.key, name], {
+          value: value as JsonObject | undefined,
+          label: file,
+        }),
+    };
+  }
+  return {
+    empty: "{}\n",
+    read: (text: string) =>
+      parseDocument(text, { jsonc: target.format === "jsonc", label: file }).value,
+    set: (text: string, name: string, value: unknown) => setServer(text, [target.key, name], value),
+  };
+}
+
 // Work out the edited text for one target without touching the disk
 export function planTarget({ target: targetName, file, servers, managed }: PlanInput): Plan {
   const target = TARGETS[targetName];
+  const format = formatOf(target, file);
   const current = snapshot(file);
-  let text = current === null ? "{}\n" : decodeUtf8(current.raw, file);
-  const { value } = parseDocument(text, { jsonc: target.jsonc, label: file });
+  let text = current === null ? format.empty : decodeUtf8(current.raw, file);
+  const value = format.read(text);
 
   // The servers map must be an object if it exists
   const entries = value[target.key] ?? {};
@@ -58,7 +82,7 @@ export function planTarget({ target: targetName, file, servers, managed }: PlanI
     throw new InstallError(`${file}: "${target.key}" must be an object`);
   }
   const edit = (name: string, entry: unknown) => {
-    text = setServer(text, [target.key, name], entry);
+    text = format.set(text, name, entry);
   };
 
   // Add or replace declared servers; adopt identical hand-made ones, refuse different ones
