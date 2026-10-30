@@ -75,7 +75,7 @@ test("installer MCP servers", { skip }, async (t) => {
   await t.test("on-demand servers are not installed", (t) => {
     const m = mcpFixture(t);
     m.addMcp("alpha/tool", { command: "tool", tools: ["read"] });
-    m.addMcp("alpha/lazy", { command: "tool", load: "on-demand" });
+    m.addMcp("alpha/lazy", { command: "absent", load: "on-demand" });
     install(m.f);
 
     // Only the static server reaches each agent, with its allowlist on Copilot

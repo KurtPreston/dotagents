@@ -157,6 +157,13 @@ test("loadServers resolves every command before returning", (t) => {
   const [server] = loadServers([plugin], { home: root, searchPath: path.join(root, "bin") });
   assert.equal(server.command, npx);
 
+  // On-demand servers aren't returned, so their commands needn't be on PATH
+  declare(root, "p/lazy", { command: "missing", load: "on-demand" });
+  assert.deepEqual(
+    loadServers([plugin], { home: root, searchPath: path.join(root, "bin") }).map((s) => s.name),
+    ["linear"],
+  );
+
   declare(root, "p/other", { command: "missing" });
   assert.throws(
     () => loadServers([plugin], { home: root, searchPath: path.join(root, "bin") }),

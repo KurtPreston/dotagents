@@ -142,13 +142,17 @@ export function resolveCommand(
   return resolved;
 }
 
-// Load declarations and resolve every command, so failures happen before any edits
+// Load the static servers agents install and resolve their commands, so failures happen
+// before any edits. On-demand servers are skipped; mcp-call resolves them when called, so
+// their programs need not be installed on every machine.
 export function loadServers(
   pluginDirs: string[],
   { home, searchPath }: { home: string; searchPath: string | undefined },
 ): Server[] {
-  return loadDeclarations(pluginDirs).map((server) => ({
-    ...server,
-    command: resolveCommand(server.command, { home, searchPath, label: server.label }),
-  }));
+  return loadDeclarations(pluginDirs)
+    .filter((server) => !server.onDemand)
+    .map((server) => ({
+      ...server,
+      command: resolveCommand(server.command, { home, searchPath, label: server.label }),
+    }));
 }

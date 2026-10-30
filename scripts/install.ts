@@ -266,9 +266,7 @@ function main(argv: string[]): void {
 
   // MCP servers sync when any are declared, or to prune ones installed earlier
   // On-demand servers stay out of agent configs; agents reach them through mcp-call
-  const servers = loadServers(plugins, { home: homes.HOME, searchPath: process.env.PATH }).filter(
-    (server) => !server.onDemand,
-  );
+  const servers = loadServers(plugins, { home: homes.HOME, searchPath: process.env.PATH });
   const runMcp =
     servers.length > 0 || fs.existsSync(path.join(homes.AGENTS_HOME, "state", "mcp.json"));
   if (runMcp) {
