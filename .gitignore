@@ -10,3 +10,6 @@
 # Plugins other than the committed defaults are separate repos or stay on this machine
 /plugins/*
 !/plugins/dotagents-defaults/
+
+# Mac clutter
+.DS_Store
