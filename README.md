@@ -46,6 +46,12 @@ A plugin is a folder under `plugins/` with any of these:
 
 Rerun `./install.sh` after adding, removing, or editing a plugin. It removes links to skills and scripts that plugins no longer provide, and MCP servers no plugin declares anymore.
 
+### Deliberating difficult decisions
+
+The built-in [`deliberate` skill](plugins/dotagents-defaults/skills/deliberate/SKILL.md) coordinates independent proposals from different models, evidence-based critique, and bounded revision. Use `/deliberate <question>` for a difficult decision, especially outside your expertise. It defaults to Astra and Opus with at most two critique/revision rounds; name different models or a smaller round budget in the prompt.
+
+The result is a recommendation with evidence, dissent, uncertainty, and a next check, not an implementation. The skill uses the host's existing agent tools and asks rather than silently substituting when distinct models are unavailable. After installing for Copilot CLI, run `/skills reload` in an existing session to discover it.
+
 ### Remote plugins
 
 List plugin repositories in `dotagents.jsonc` at the repository root:
