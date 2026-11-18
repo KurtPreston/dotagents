@@ -1,4 +1,4 @@
-// Clone or fast-forward each configured remote plugin into plugins/<name>.
+// Clone or fast-forward configured plugins, optionally returning them to their remote default branch.
 // Local changes, diverged branches, and unreachable remotes are skipped with a warning, never discarded.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -51,14 +51,81 @@ function targetRef(plugin: RemotePlugin, dir: string): string {
   return head.ok ? head.out.replace(/^origin\//, "") : "HEAD";
 }
 
+// Return to the remote's current default branch without resetting local work
+function checkoutDefault(plugin: RemotePlugin, dir: string, log: Log): void {
+  const label = `plugins/${plugin.name}`;
+  if (git(["status", "--porcelain"], dir).out !== "") {
+    log(`warning: ${label} has uncommitted changes; leaving it as is`);
+    return;
+  }
+
+  // Ask the remote rather than trusting a possibly stale origin/HEAD
+  const remote = git(["ls-remote", "--symref", "origin", "HEAD"], dir);
+  const ref = remote.out.match(/^ref: refs\/heads\/(.+)\tHEAD$/m)?.[1];
+  if (!remote.ok || !ref) {
+    log(
+      `warning: couldn't update ${label}: ${remote.ok ? "remote has no default branch" : reason(remote)}`,
+    );
+    return;
+  }
+  const fetched = git(
+    ["fetch", "--quiet", "origin", `+refs/heads/${ref}:refs/remotes/origin/${ref}`],
+    dir,
+  );
+  if (!fetched.ok) {
+    log(`warning: couldn't update ${label}: ${reason(fetched)}`);
+    return;
+  }
+
+  // Keep later normal installs following the default discovered from the remote
+  git(["symbolic-ref", "refs/remotes/origin/HEAD", `refs/remotes/origin/${ref}`], dir);
+  const target = git(["rev-parse", `refs/remotes/origin/${ref}`], dir).out;
+
+  // An existing default branch may only move forward; feature branches remain intact
+  const localRef = `refs/heads/${ref}`;
+  const exists = git(["show-ref", "--verify", "--quiet", localRef], dir).ok;
+  if (exists && !git(["merge-base", "--is-ancestor", localRef, target], dir).ok) {
+    log(`warning: ${label} has commits not on ${ref}; leaving it as is`);
+    return;
+  }
+  const branch = git(["symbolic-ref", "--quiet", "--short", "HEAD"], dir);
+  if (!branch.ok && !git(["merge-base", "--is-ancestor", "HEAD", target], dir).ok) {
+    log(`warning: ${label} has detached commits not on ${ref}; leaving it as is`);
+    return;
+  }
+
+  // Switch without force, creating a tracking branch only when it doesn't exist
+  const head = git(["rev-parse", "HEAD"], dir).out;
+  const switched = exists
+    ? git(["switch", "--quiet", "--no-guess", ref], dir)
+    : git(["switch", "--quiet", "--create", ref, "--track", `origin/${ref}`], dir);
+  const moved = switched.ok ? git(["merge", "--quiet", "--ff-only", target], dir) : switched;
+  if (!moved.ok) {
+    log(`warning: couldn't update ${label}: ${reason(moved)}`);
+    return;
+  }
+  const unchanged = branch.out === ref && head === target;
+  log(unchanged ? `up to date ${label}` : `updated ${label} to ${ref} (${target.slice(0, 7)})`);
+}
+
 // Fast-forward an existing checkout, or explain why it was left alone
-function update(plugin: RemotePlugin, dir: string, log: Log): void {
+function update(
+  plugin: RemotePlugin,
+  dir: string,
+  { log, updatePlugins }: { log: Log; updatePlugins: boolean },
+): void {
   const label = `plugins/${plugin.name}`;
   const origin = git(["remote", "get-url", "origin"], dir);
   if (!origin.ok || origin.out !== plugin.git) {
     throw new InstallError(
       `${label} exists but isn't a clone of ${plugin.git} — move it, or rename the plugin in dotagents.jsonc`,
     );
+  }
+
+  // Explicit updates return to the default branch, ignoring any configured pin for this run
+  if (updatePlugins) {
+    checkoutDefault(plugin, dir, log);
+    return;
   }
 
   // A branch checkout must be on the configured branch; detached checkouts follow tags
@@ -104,15 +171,19 @@ function update(plugin: RemotePlugin, dir: string, log: Log): void {
 // Bring every configured plugin up to date under pluginsDir
 export function syncPlugins(
   plugins: RemotePlugin[],
-  { pluginsDir, log = console.log }: { pluginsDir: string; log?: Log },
+  {
+    pluginsDir,
+    log = console.log,
+    updatePlugins = false,
+  }: { pluginsDir: string; log?: Log; updatePlugins?: boolean },
 ): void {
   for (const plugin of plugins) {
     const dir = path.join(pluginsDir, plugin.name);
     if (fs.existsSync(dir)) {
-      update(plugin, dir, log);
+      update(plugin, dir, { log, updatePlugins });
     } else {
       fs.mkdirSync(pluginsDir, { recursive: true });
-      clone(plugin, dir, log);
+      clone(updatePlugins ? { name: plugin.name, git: plugin.git } : plugin, dir, log);
     }
   }
 }

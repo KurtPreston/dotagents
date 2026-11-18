@@ -68,6 +68,7 @@ List plugin repositories in `dotagents.jsonc` at the repository root:
 - `name` is the folder under `plugins/`. `./install.sh --add GIT_URL` appends an entry, naming it after the repository unless you pass `--name`, and creates the file if needed.
 - `ref` is a branch or tag to follow. Without it, the plugin follows its remote's default branch.
 - Each install clones missing plugins and fast-forwards the rest. A plugin with uncommitted changes, local commits, or a different branch checked out is left alone with a warning, as is one whose fetch fails, so offline installs still work.
+- Pass `-u` or `--update-plugins` to switch every configured plugin back to its remote's current default branch (`main`, `master`, etc.) and fast-forward it. This overrides `ref` for that run, including newly cloned plugins, without changing `dotagents.jsonc`. Feature branches and their commits are preserved; dirty checkouts, default branches with local commits, detached commits not on the default branch, and unreachable remotes are left alone with a warning. Built-in and local-only plugins aren't changed.
 - A folder whose `origin` doesn't match its `git` URL fails the install, so fix or remove it first.
 
 Folders in `plugins/` that aren't listed are local-only plugins. Git ignores everything in `plugins/` except `dotagents-defaults`, so a local plugin can be a plain folder or its own repository:
@@ -103,6 +104,13 @@ Name agents to install exactly those, whether or not they're detected:
 ```sh
 ./install.sh cursor zed
 ./install.sh claude copilot codex
+```
+
+Return configured plugins to their remote default branches before installing (optionally name agents as above):
+
+```sh
+./install.sh -u
+./install.sh --update-plugins zed
 ```
 
 The installer configures:

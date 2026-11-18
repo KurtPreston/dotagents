@@ -98,6 +98,201 @@ test("installer remote plugins", { skip }, async (t) => {
     assert.match(install(r.f, ["claude"]).stdout, /up to date plugins\/team/);
   });
 
+  for (const flag of ["-u", "--update-plugins"]) {
+    await t.test(`${flag} returns every configured plugin to its default branch`, (t) => {
+      const r = remoteFixture(t);
+      const first = r.addRemote("first");
+      first.commit();
+      const second = r.addRemote("second");
+      second.commit();
+      git(second.work, "branch", "--move", "master");
+      git(second.work, "push", "--quiet", "origin", "master");
+      git(second.bare, "symbolic-ref", "HEAD", "refs/heads/master");
+      r.writeConfig([
+        { name: "first", git: first.bare },
+        { name: "second", git: second.bare },
+      ]);
+      install(r.f, ["claude"]);
+
+      // Ordinary installs leave feature branches alone, even at the same commit
+      for (const name of ["first", "second"]) {
+        git(r.cloned(name), "checkout", "--quiet", "-b", "feature");
+      }
+      assert.match(install(r.f, ["claude"]).stdout, /is on branch feature/);
+      const latest = first.commit("## Updated first\n");
+      const result = install(r.f, ["claude", flag]);
+      assert.match(result.stdout, /updated plugins\/first to main/);
+      assert.match(result.stdout, /updated plugins\/second to master/);
+      assert.equal(r.headOf("first"), latest);
+      assert.match(fs.readFileSync(r.f.agents, "utf8"), /## Updated first/);
+
+      // Both aliases select the actual branch, not just its commit
+      assert.equal(git(r.cloned("first"), "branch", "--show-current"), "main");
+      assert.equal(git(r.cloned("second"), "branch", "--show-current"), "master");
+      assert.match(install(r.f, [flag, "claude"]).stdout, /up to date plugins\/first/);
+    });
+  }
+
+  await t.test("--update-plugins preserves commits on feature branches", (t) => {
+    const r = remoteFixture(t);
+    const remote = r.addRemote("team");
+    remote.commit("## Main\n");
+    r.writeConfig([{ name: "team", git: remote.bare }]);
+    install(r.f, ["claude"]);
+
+    // Unpushed feature commits remain reachable after returning to main
+    git(r.cloned("team"), "checkout", "--quiet", "-b", "feature");
+    fs.writeFileSync(path.join(r.cloned("team"), "rules", "rule.md"), "## Feature\n");
+    git(r.cloned("team"), "commit", "--quiet", "-am", "feature");
+    const feature = r.headOf("team");
+    const latest = remote.commit("## Latest main\n");
+    install(r.f, ["-u", "claude"]);
+    assert.equal(r.headOf("team"), latest);
+    assert.equal(git(r.cloned("team"), "rev-parse", "feature"), feature);
+  });
+
+  await t.test("--update-plugins creates a missing local default branch", (t) => {
+    const r = remoteFixture(t);
+    const remote = r.addRemote("team");
+    const latest = remote.commit();
+    r.writeConfig([{ name: "team", git: remote.bare }]);
+    install(r.f, ["claude"]);
+
+    // A feature-only checkout gets a new tracking branch without resetting anything
+    git(r.cloned("team"), "branch", "--move", "feature");
+    install(r.f, ["--update-plugins", "claude"]);
+    assert.equal(git(r.cloned("team"), "branch", "--show-current"), "main");
+    assert.equal(git(r.cloned("team"), "rev-parse", "--abbrev-ref", "@{upstream}"), "origin/main");
+    assert.equal(r.headOf("team"), latest);
+  });
+
+  await t.test("--update-plugins discovers a changed remote default branch", (t) => {
+    const r = remoteFixture(t);
+    const remote = r.addRemote("team");
+    remote.commit();
+    r.writeConfig([{ name: "team", git: remote.bare }]);
+    install(r.f, ["claude"]);
+
+    // origin/HEAD still names main after the remote changes its default to trunk
+    git(remote.work, "checkout", "--quiet", "-b", "trunk");
+    const latest = remote.commit("## Trunk\n");
+    git(remote.bare, "symbolic-ref", "HEAD", "refs/heads/trunk");
+    install(r.f, ["-u", "claude"]);
+    assert.equal(git(r.cloned("team"), "branch", "--show-current"), "trunk");
+    assert.equal(r.headOf("team"), latest);
+
+    // Later ordinary installs follow the new default, too
+    const next = remote.commit("## New trunk\n");
+    install(r.f, ["claude"]);
+    assert.equal(r.headOf("team"), next);
+  });
+
+  await t.test(
+    "--update-plugins overrides pins for existing and missing clones only for this run",
+    (t) => {
+      const r = remoteFixture(t);
+      const remote = r.addRemote("team");
+      const pinned = remote.commit("## Pinned\n");
+      git(remote.work, "tag", "v1");
+      git(remote.work, "push", "--quiet", "origin", "v1");
+      const latest = remote.commit("## Latest\n");
+      r.writeConfig([
+        { name: "existing", git: remote.bare, ref: "v1" },
+        { name: "missing", git: remote.bare, ref: "v1" },
+      ]);
+
+      // Start with just one pinned checkout; the flag also applies when cloning the other
+      git(r.f.plugins, "clone", "--quiet", "--branch", "v1", remote.bare, r.cloned("existing"));
+      assert.equal(r.headOf("existing"), pinned);
+      const config = fs.readFileSync(r.config, "utf8");
+      install(r.f, ["-u", "claude"]);
+      for (const name of ["existing", "missing"]) {
+        assert.equal(git(r.cloned(name), "branch", "--show-current"), "main");
+        assert.equal(r.headOf(name), latest);
+      }
+      assert.equal(fs.readFileSync(r.config, "utf8"), config);
+    },
+  );
+
+  await t.test("--update-plugins leaves dirty feature branches untouched", (t) => {
+    const r = remoteFixture(t);
+    const remote = r.addRemote("team");
+    const before = remote.commit();
+    r.writeConfig([{ name: "team", git: remote.bare }]);
+    install(r.f, ["claude"]);
+
+    // Neither tracked edits nor untracked files may be carried onto another branch
+    git(r.cloned("team"), "checkout", "--quiet", "-b", "feature");
+    for (const file of ["rules/rule.md", "untracked.md"]) {
+      const edited = path.join(r.cloned("team"), file);
+      fs.writeFileSync(edited, "## Edited\n");
+      const result = install(r.f, ["--update-plugins", "claude"]);
+      assert.match(result.stdout, /plugins\/team has uncommitted changes/);
+      assert.equal(git(r.cloned("team"), "branch", "--show-current"), "feature");
+      assert.equal(r.headOf("team"), before);
+      assert.equal(fs.readFileSync(edited, "utf8"), "## Edited\n");
+      git(r.cloned("team"), "restore", "rules/rule.md");
+    }
+  });
+
+  await t.test("--update-plugins won't reset local default-branch commits", (t) => {
+    const r = remoteFixture(t);
+    const remote = r.addRemote("team");
+    remote.commit();
+    r.writeConfig([{ name: "team", git: remote.bare }]);
+    install(r.f, ["claude"]);
+
+    // Detect an ahead or diverged default branch even while a feature branch is checked out
+    fs.writeFileSync(path.join(r.cloned("team"), "rules", "rule.md"), "## Mine\n");
+    git(r.cloned("team"), "commit", "--quiet", "-am", "mine");
+    const mine = r.headOf("team");
+    git(r.cloned("team"), "checkout", "--quiet", "-b", "feature");
+    for (const diverged of [false, true]) {
+      if (diverged) {
+        remote.commit("## Remote\n");
+      }
+      const result = install(r.f, ["-u", "claude"]);
+      assert.match(result.stdout, /plugins\/team has commits not on main/);
+      assert.equal(git(r.cloned("team"), "branch", "--show-current"), "feature");
+      assert.equal(r.headOf("team"), mine);
+      assert.equal(git(r.cloned("team"), "rev-parse", "main"), mine);
+    }
+  });
+
+  await t.test("--update-plugins preserves unreferenced detached commits", (t) => {
+    const r = remoteFixture(t);
+    const remote = r.addRemote("team");
+    remote.commit();
+    r.writeConfig([{ name: "team", git: remote.bare }]);
+    install(r.f, ["claude"]);
+
+    // A detached local commit has no branch to keep it reachable after switching away
+    git(r.cloned("team"), "checkout", "--quiet", "--detach");
+    fs.writeFileSync(path.join(r.cloned("team"), "rules", "rule.md"), "## Detached\n");
+    git(r.cloned("team"), "commit", "--quiet", "-am", "detached");
+    const detached = r.headOf("team");
+    const result = install(r.f, ["-u", "claude"]);
+    assert.match(result.stdout, /plugins\/team has detached commits not on main/);
+    assert.equal(git(r.cloned("team"), "branch", "--show-current"), "");
+    assert.equal(r.headOf("team"), detached);
+  });
+
+  await t.test("--update-plugins warns on unreachable remotes without switching branches", (t) => {
+    const r = remoteFixture(t);
+    const remote = r.addRemote("team");
+    const before = remote.commit();
+    r.writeConfig([{ name: "team", git: remote.bare }]);
+    install(r.f, ["claude"]);
+
+    // An offline install still uses the checkout's existing content
+    git(r.cloned("team"), "checkout", "--quiet", "-b", "feature");
+    fs.rmSync(remote.bare, { recursive: true });
+    const result = install(r.f, ["--update-plugins", "claude"]);
+    assert.match(result.stdout, /couldn't update plugins\/team/);
+    assert.equal(git(r.cloned("team"), "branch", "--show-current"), "feature");
+    assert.equal(r.headOf("team"), before);
+  });
+
   await t.test("uncommitted changes are left alone", (t) => {
     const r = remoteFixture(t);
     const remote = r.addRemote("team");

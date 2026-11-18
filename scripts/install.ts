@@ -1,5 +1,5 @@
 // Install dotagents into each selected agent: instructions, skills, scripts, settings, and MCP servers.
-// Usage: node scripts/install.ts [--runner] [--add GIT_URL [--name NAME] [--ref REF]] [cursor] [zed] [claude] [copilot] [codex]
+// Usage: node scripts/install.ts [-u|--update-plugins] [--runner] [--add GIT_URL [--name NAME] [--ref REF]] [cursor] [zed] [claude] [copilot] [codex]
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -71,18 +71,21 @@ function resolveHomes(env: NodeJS.ProcessEnv, runner: boolean): Homes {
 
 interface Options {
   runner: boolean;
+  updatePlugins: boolean;
   add?: { git: string; name?: string; ref?: string };
   targets: string[];
 }
 
 // Split options from target names; --name and --ref only qualify --add
 function parseOptions(argv: string[]): Options {
-  const options: Options = { runner: false, targets: [] };
+  const options: Options = { runner: false, updatePlugins: false, targets: [] };
   const values: Record<string, string> = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index] ?? "";
     if (arg === "--runner") {
       options.runner = true;
+    } else if (arg === "-u" || arg === "--update-plugins") {
+      options.updatePlugins = true;
     } else if (["--add", "--name", "--ref"].includes(arg)) {
       const value = argv[index + 1];
       if (value === undefined || value.startsWith("--")) {
@@ -218,7 +221,7 @@ function writeFile(file: string, text: string): void {
 
 function main(argv: string[]): void {
   // Parse options, targets, and homes
-  const { runner, add, targets: names } = parseOptions(argv);
+  const { runner, updatePlugins, add, targets: names } = parseOptions(argv);
   const targets = parseTargets(names, runner);
   const homes = resolveHomes(process.env, runner);
 
@@ -227,7 +230,10 @@ function main(argv: string[]): void {
     const entry = addPlugin(REPO_ROOT, add);
     console.log(`added plugin '${entry.name}' to dotagents.jsonc`);
   }
-  syncPlugins(readConfig(REPO_ROOT), { pluginsDir: path.join(REPO_ROOT, "plugins") });
+  syncPlugins(readConfig(REPO_ROOT), {
+    pluginsDir: path.join(REPO_ROOT, "plugins"),
+    updatePlugins,
+  });
   const has = (target: Target) => targets.includes(target);
   const agents = path.join(REPO_ROOT, "AGENTS.md");
 
