@@ -1,6 +1,7 @@
 // Tests for the stdio MCP client and mcp-call's output helpers, against a fake server.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpClient } from "../scripts/mcp/client.ts";
@@ -54,4 +55,12 @@ test("summarizes descriptions to their first sentence", () => {
 test("renders non-text content as placeholders and falls back to structured content", () => {
   assert.equal(renderResult({ content: [{ type: "image" }] }), "[image content omitted]");
   assert.equal(renderResult({ structuredContent: { ok: true } }), '{\n  "ok": true\n}');
+});
+
+test("exits without cutting off large piped output", () => {
+  const script = path.join(path.dirname(FAKE), "big-output.ts");
+  const size = 200_000;
+  const run = spawnSync(process.execPath, [script, String(size)], { encoding: "utf8" });
+  assert.equal(run.status, 0);
+  assert.equal(run.stdout.length, size + 1);
 });
