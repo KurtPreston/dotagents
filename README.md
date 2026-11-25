@@ -52,6 +52,10 @@ The built-in [`deliberate` skill](plugins/dotagents-defaults/skills/deliberate/S
 
 The result is a recommendation with evidence, dissent, uncertainty, and a next check, not an implementation. The skill uses the host's existing agent tools and asks rather than silently substituting when distinct models are unavailable. After installing for Copilot CLI, run `/skills reload` in an existing session to discover it.
 
+### Wrapping up a session
+
+The built-in [`wrap-up` skill](plugins/dotagents-defaults/skills/wrap-up/SKILL.md) checks a session for lingering threads before you close it. It inventories the session's requests, promises, unanswered proposals, unsent drafts, changes, and running work, checks each against its live state, and lists what's still open, most important first. Answer each item by number, such as "defer to tomorrow" or "handling it in another session", and it records or cleans up accordingly. Use `/wrap-up`, or ask whether it's safe to close.
+
 ### Remote plugins
 
 List plugin repositories in `dotagents.jsonc` at the repository root:
