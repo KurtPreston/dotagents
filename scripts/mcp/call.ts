@@ -50,6 +50,11 @@ function parseArgs(text: string | undefined): object {
   return value;
 }
 
+// Exit once stdout has drained; process.exit alone drops piped output past 64 KiB
+export function exitAfterFlush(code: number): void {
+  process.stdout.write("", () => process.exit(code));
+}
+
 async function main(argv: string[]): Promise<number> {
   // Find declarations; with no server named, list them
   const servers = loadDeclarations(findPlugins(REPO_ROOT));
@@ -116,7 +121,7 @@ async function main(argv: string[]): Promise<number> {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   main(process.argv.slice(2)).then(
-    (code) => process.exit(code),
+    (code) => exitAfterFlush(code),
     (error: unknown) => {
       console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);
