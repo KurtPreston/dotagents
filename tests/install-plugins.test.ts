@@ -4,17 +4,19 @@ import type { TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { nameFromUrl } from "../scripts/plugins/config.ts";
 import { addRule, assertPreflightFailure, fixture, install, skip } from "./support/installer.ts";
 
-// Run git with a fixed identity, returning trimmed output
+// Run git with a fixed identity and isolated from host config, returning trimmed output
 function git(cwd: string, ...args: string[]): string {
   return execFileSync(
     "git",
     ["-c", "user.name=Test", "-c", "user.email=test@example.com", ...args],
     {
       cwd,
+      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: os.devNull },
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -107,7 +109,7 @@ test("installer remote plugins", { skip }, async (t) => {
       second.commit();
       git(second.work, "branch", "--move", "master");
       git(second.work, "push", "--quiet", "origin", "master");
-      git(second.bare, "symbolic-ref", "HEAD", "refs/heads/master");
+      git(second.bare, "--git-dir", second.bare, "symbolic-ref", "HEAD", "refs/heads/master");
       r.writeConfig([
         { name: "first", git: first.bare },
         { name: "second", git: second.bare },
@@ -176,7 +178,7 @@ test("installer remote plugins", { skip }, async (t) => {
     // origin/HEAD still names main after the remote changes its default to trunk
     git(remote.work, "checkout", "--quiet", "-b", "trunk");
     const latest = remote.commit("## Trunk\n");
-    git(remote.bare, "symbolic-ref", "HEAD", "refs/heads/trunk");
+    git(remote.bare, "--git-dir", remote.bare, "symbolic-ref", "HEAD", "refs/heads/trunk");
     install(r.f, ["-u", "claude"]);
     assert.equal(git(r.cloned("team"), "branch", "--show-current"), "trunk");
     assert.equal(r.headOf("team"), latest);
